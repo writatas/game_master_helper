@@ -6,17 +6,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-store_rpg = {path = "./store_rpg"}
-entities = {path = "./entities"}
-narratives = {path = "./narratives"}
-gui = {path = "./gui"}
+# dependencies store_rpg
 sqlite = "0.30.4"
-
-[workspace]
-members = [
-	"roll_dice",
-	"narratives",
-	"entities",
-	"libtext",
-	"store_rpg",
-]
+# dependencies for libtext
+hound = "3.5.0"
+whisper-rs = "0.4.0"
+log = "0.4.17"
+anyhow = "1.0.69"
+cpal = "0.15.0"
+# dependencies for narratives
+serde = {version = "1.0.164", features = ["derive"]}
+serde_json = "1.0.97"
+# dependencies for roll_dice
+rand = "0.8.5"
+# dependencies for entities
+ eframe = "0.21.3"
