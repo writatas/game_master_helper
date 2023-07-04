@@ -2,7 +2,7 @@
 use eframe::egui::TextBuffer;
 use std::cell::Cell;
 use rand::{thread_rng, Rng};
-
+//use std::env::var;
 // Traits
 trait DiceRoll {
     fn roll(&self) -> (Vec<u32>, String);
@@ -25,18 +25,23 @@ struct Story {
 }
 
 impl Story {
-    pub fn new(id: u32, order_num: u32, label: &str, raw_narration: &str) -> Story {
-        Story {
+    pub fn new(id: u32, order_num: u32, label: &str, raw_narration: &str) -> Result<Story, String> {
+        let story = Story {
             edit:Cell::new(true), // defaults to true
             id, 
             order_num,
             label: label.to_string(), 
             raw_narration: raw_narration.to_string(), 
-        } 
+        };
+        Ok(story)
     }
     // TODO create a summarizing type to initilize the summary of the Story when created
-    pub fn summarize(self) -> String {
-        self.raw_narration
+    pub fn summary(self) -> Result<String, String> {
+        Ok(self.raw_narration)
+    }
+    pub fn get_word_count(self) -> u32 {
+        let words: Vec<&str> = self.raw_narration.split_whitespace().into_iter().collect();
+        words.len() as u32
     }
 }
 
@@ -67,7 +72,33 @@ struct Attribute {
     pub order_num: u32,
     pub label: String,
     pub description: String,
+    pub modifier: u32, // (Ability score - 10) / 2
+    pub roll: Outcome
+}
 
+impl Attribute {
+    pub fn new(id: u32, order_num: u32, label: String, description: String, roll: Roll, critical: u32) -> Result<Attribute, String> {
+        let roll = Outcome::new(&roll, critical, true);
+        let attribute = Attribute {
+            id,
+            order_num,
+            label,
+            description,
+            edit: Cell::new(false),
+            modifier: (roll.base_result - 10) / 2 as u32,
+            roll
+        };
+        Ok(attribute)
+    }
+    pub fn get_description(self) -> String {
+        let description = format!(
+            "{} {}({})",
+            self.label,
+            self.roll.base_result,
+            self.modifier
+        );
+        description
+    }
 }
 
 
@@ -78,6 +109,22 @@ struct Skill {
     pub id: u32,
     pub order_num: u32,
     pub label: String,
+    pub level: u32,
+    pub proficiency: u32 // 2 + (1/4 * level - 1)
+}
+
+impl Skill {
+    pub fn new(id: u32, order_num: u32, label: String, level: u32) -> Result<Skill, String> {
+        let skill = Skill {
+            id,
+            order_num,
+            label,
+            edit: Cell::new(false),
+            level, 
+            proficiency: 2 + (1/4 * level - 1) as u32
+        };
+        Ok(skill)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -86,6 +133,7 @@ struct Counter {
     pub id: u32,
     pub order_num: u32,
     pub label: String,
+    pub number: u32
 }
 
 #[derive(Clone, Debug)]
@@ -101,7 +149,7 @@ pub struct Roll {
     pub pinned: Cell<bool>,
     pub dice_label: String,
     pub dice: u32,
-    pub amount: u32
+    pub amount: u32,
 }
 
 impl Roll {
@@ -138,9 +186,9 @@ pub struct Outcome {
 }
 
 impl Outcome {
-    pub fn new(roll: &Roll, critical: u32, bonus: u32, attribute: bool) -> Outcome {  
+    pub fn new(roll: &Roll, critical: u32, attribute: bool) -> Outcome {  
         let mut rolled = roll.roll().0;           
-        let roll_description = format!("Roll: {} + {}", roll.dice_label, &bonus);
+        let roll_description = format!("Roll: {}", roll.dice_label);
         let (max, min) =
             if critical == 20 {
                 (*rolled.iter().max().unwrap(), *rolled.iter().min().unwrap())
@@ -159,7 +207,6 @@ impl Outcome {
             }
         }
         let mut  base_result: u32 = rolled.iter().sum();
-        base_result += bonus;
         
         Outcome {
             roll_description,
@@ -174,7 +221,6 @@ impl Outcome {
     pub fn success_of_roll(&self, opposition: &Outcome, difficulty: u32) -> (bool, u32) {
         let difficulty = if opposition.attribute == true
                         {opposition.base_result.clone()} else {difficulty};
-        
         let winner = match opposition.attribute {
             true => if self.critical == 20 {
                 self.base_result >= difficulty && self.base_result >= opposition.base_result
