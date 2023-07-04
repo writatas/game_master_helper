@@ -1,10 +1,10 @@
 mod entities;
 mod libtext;
-mod narratives;
 mod roll_dice;
 mod store_rpg;
+mod enums;
 pub use entities::*;
 pub use libtext::*;
-pub use narratives::*;
 pub use roll_dice::*;
 pub use store_rpg::*;
+pub use enums::*;
