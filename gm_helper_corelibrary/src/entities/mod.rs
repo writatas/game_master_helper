@@ -2,7 +2,18 @@
 use eframe::egui::TextBuffer;
 use std::cell::Cell;
 use rand::{thread_rng, Rng};
-//use std::env::var;
+use std::collections::HashMap;
+use serde_json;
+
+//Constants
+const NUMBER_LIMIT:i32 = 10_000;
+
+// enums for structs
+pub enum Boon {
+    Advantage,
+    Disadvantage,
+    Plain
+}
 // Traits
 trait DiceRoll {
     fn roll(&self) -> (Vec<u32>, String);
@@ -13,8 +24,14 @@ pub trait SaveLoad {
     fn update(&self, database_path: &str, entity_id: u32, order_num: u32, update_entity: Self::Entity) -> Result<(), String>;
     fn delete(&self, database_path: &str, entity_id: u32) -> Result<(), String>;
 }
-
-
+//Helper functions for structs
+fn parse_key(key_str: &str) -> Result<(u32, u32), std::num::ParseIntError> {
+    let parts: Vec<&str> = key_str.split(',').collect();
+    let x = parts[0].parse()?;
+    let y = parts[1].parse()?;
+    Ok((x, y))
+}
+// structs
 #[derive(Clone, Debug)]
 struct Story {
     pub edit: Cell<bool>,
@@ -101,8 +118,6 @@ impl Attribute {
     }
 }
 
-
-
 #[derive(Clone, Debug)]
 struct Skill {
     pub edit: Cell<bool>,
@@ -110,20 +125,74 @@ struct Skill {
     pub order_num: u32,
     pub label: String,
     pub level: u32,
-    pub proficiency: u32 // 2 + (1/4 * level - 1)
+    pub skill_level: u32,
+    pub has_proficiency: bool,
+    pub proficiency: i32 // 2 + (1/4 * level - 1)
 }
 
 impl Skill {
-    pub fn new(id: u32, order_num: u32, label: String, level: u32) -> Result<Skill, String> {
+    pub fn new(id: u32, order_num: u32, label: String, level: u32, skill_level: u32, has_proficiency: bool) -> Result<Skill, String> {
         let skill = Skill {
             id,
             order_num,
             label,
             edit: Cell::new(false),
             level, 
-            proficiency: 2 + (1/4 * level - 1) as u32
+            skill_level,
+            has_proficiency,
+            proficiency: 2 + (1/4 * level - 1) as i32
         };
         Ok(skill)
+    }
+
+    pub fn get_description(self) -> Result<String, String> {
+        if self.has_proficiency {
+            return Ok(format!("{} {}({})", self.label, self.skill_level, self.proficiency));
+        }
+        Ok(format!("{} {}", self.label, self.skill_level))
+    }
+    pub fn roll_skill(self, advantage: Boon, critical: u32, difficulty: u32) -> String {
+            match advantage {
+                Boon::Advantage => {
+                    let mut roll = Outcome::new(&Roll::new(20, 2), critical, false);
+                    roll.base_result = if self.proficiency < 0 {roll.max - self.proficiency as u32} else {roll.max + self.proficiency as u32};
+                    let success = roll.success_of_roll(None, difficulty);
+                    format!(
+                        "{}({}) - rolled with advantage {}, {} vs {}",
+                        self.label,
+                        self.proficiency,
+                        roll.base_result,
+                        if success.0 {"success"} else {"failure"},
+                        success.1
+                    )
+                },
+                Boon::Disadvantage => {
+                    let mut roll = Outcome::new(&Roll::new(20, 2), critical, false);
+                    roll.base_result = if self.proficiency < 0 {roll.min - self.proficiency as u32} else {roll.min + self.proficiency as u32};
+                    let success = roll.success_of_roll(None, difficulty);
+                    format!(
+                        "{}({}) - rolled with disadvantage {}, {} vs {}",
+                        self.label,
+                        self.proficiency,
+                        roll.base_result,
+                        if success.0 {"success"} else {"failure"},
+                        success.1
+                    )
+                },
+                Boon::Plain => {
+                    let mut roll = Outcome::new(&Roll::new(20, 1), critical, false);
+                    roll.base_result += if self.proficiency < 0 {roll.base_result - self.proficiency as u32} else {roll.base_result + self.proficiency as u32};
+                    let success = roll.success_of_roll(None, difficulty);
+                    format!(
+                        "{}({}) - rolled {}, {} vs {}",
+                        self.label,
+                        self.proficiency,
+                        roll.base_result,
+                        if success.0 {"success"} else {"failure"},
+                        success.1
+                    )
+                }
+            }
     }
 }
 
@@ -133,8 +202,33 @@ struct Counter {
     pub id: u32,
     pub order_num: u32,
     pub label: String,
-    pub number: u32
+    pub number: i32
 }
+
+impl Counter {
+    pub fn new(id: u32, order_num: u32, label: String, number: i32) -> Counter{
+        let number = if number > NUMBER_LIMIT || number < (NUMBER_LIMIT * -1) {0} else {number};
+        Counter {
+            id,
+            order_num,
+            edit: Cell::new(false),
+            label,
+            number
+        }
+    }
+    pub fn get_description(self) -> String {
+        format!("{}: {}", self.label, self.number)
+    }
+    pub fn increment(&mut self, number: i32) {
+        self.number += number;
+        if self.number > NUMBER_LIMIT || self.number < NUMBER_LIMIT * -1 {self.number = 0} else {self.number = self.number};
+    }
+    pub fn decrement(&mut self, number: i32) {
+        self.number -= number;
+        if self.number > NUMBER_LIMIT || self.number < NUMBER_LIMIT * -1 {self.number = 0} else {self.number = self.number};
+    }
+}
+
 
 #[derive(Clone, Debug)]
 struct Table {
@@ -142,6 +236,73 @@ struct Table {
     pub id: u32,
     pub order_num: u32,
     pub label: String,
+    pub table: HashMap<(u32, u32), String>
+}
+impl Table {
+    pub fn new(id: u32, order_num: u32, label: String, table: Vec<((u32, u32), String)>) -> Result<Table, String> {
+        let vec_to_hash: HashMap<(u32, u32), String> = table.into_iter().collect();
+        let new_table = Table {
+            edit: Cell::new(false),
+            id,
+            order_num,
+            label,
+            table: vec_to_hash
+        };
+        Ok(new_table)
+    }
+        // Serialize the table values into json to be easily stored in a database
+        pub fn values_to_json(&self) -> String {
+            let map = &self.table;
+            let mut data = Vec::new();
+            for (key, value) in map {
+                let key_str = format!("{},{}", key.0, key.1);
+                let item = serde_json::json!({key_str: value});
+                data.push(item);
+            }
+            let value: serde_json::Value = data.into();
+            serde_json::to_string(&value).unwrap()
+        }
+        // Use to Deserialize table values from it's Serialized json value
+        pub fn values_from_json(json_str: &str) ->  HashMap<(u32, u32), String> {
+            let value: serde_json::Value = serde_json::from_str(json_str).unwrap();
+            let mut map = HashMap::new();
+            if let serde_json::Value::Array(items) = value {
+                for item in items {
+                    if let serde_json::Value::Object(obj) = item {
+                        for (key_str, value) in obj {
+                            if let Ok((x, y)) = parse_key(&key_str) {
+                                if let serde_json::Value::String(s) = value {
+                                    map.insert((x, y), s);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            map
+        }
+        pub fn roll_to_text(&self, roll: &Outcome) -> String {
+            let roll_result: u32 = roll.base_result;
+            let mut result: String = String::from("");
+            for (range, value) in self.table.iter() {
+                if roll_result >= range.0 && roll_result <= range.1 {
+                    result = value.clone();
+                }
+            }
+            if result.len() == 0 {
+                return "Roll failed to produce a value.".to_string()
+            }
+            result
+        }
+        pub fn add_row(&mut self, higher: u32, text: String) {
+            let keys:Vec<&(u32, u32)> = self.table.keys().collect();
+            let lower = if Some(keys.last()).is_some() {keys.last().unwrap().1} else {0};
+            let higher = if higher > lower && higher < NUMBER_LIMIT as u32 {higher} else {lower};
+            self.table.insert((lower, higher), text);
+        }
+        pub fn clear_table(&mut self) {
+            self.table.clear()
+        } 
 }
 
 #[derive(Clone, Debug)]
@@ -181,7 +342,7 @@ pub struct Outcome {
     pub base_result: u32,
     pub max: u32,
     pub min: u32,
-    pub attribute: bool,
+    pub attribute: bool, // for creating attributes automatically
     pub critical: u32
 }
 
@@ -206,7 +367,7 @@ impl Outcome {
                 rolled.remove(max_index);
             }
         }
-        let mut  base_result: u32 = rolled.iter().sum();
+        let base_result: u32 = rolled.iter().sum();
         
         Outcome {
             roll_description,
@@ -218,23 +379,20 @@ impl Outcome {
         }
     }
 
-    pub fn success_of_roll(&self, opposition: &Outcome, difficulty: u32) -> (bool, u32) {
-        let difficulty = if opposition.attribute == true
-                        {opposition.base_result.clone()} else {difficulty};
-        let winner = match opposition.attribute {
-            true => if self.critical == 20 {
-                self.base_result >= difficulty && self.base_result >= opposition.base_result
-            } else {
-                self.base_result <= difficulty && self.base_result <= opposition.base_result
-            },
-            false => if self.critical == 20 {
-                self.base_result >= difficulty
-            } else {
-                self.base_result <= difficulty
-            }
+    pub fn success_of_roll(&self, opposition: Option<&Outcome>, difficulty: u32) -> (bool, u32) {
+        let difficulty = match opposition {
+            Some(opposition) if opposition.attribute => opposition.base_result.clone(),
+            _ => difficulty,
         };
-
+        let winner = match opposition {
+            Some(opposition) if self.critical == 20 => {
+                self.base_result >= difficulty && self.base_result >= opposition.base_result
+            }
+            Some(opposition) => self.base_result <= difficulty && self.base_result <= opposition.base_result,
+            None if self.critical == 20 => self.base_result >= difficulty,
+            None => self.base_result <= difficulty,
+        };
+    
         (winner, difficulty)
-    }
+    }    
 }
-

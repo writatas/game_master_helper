@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+// Encounter calculator
 pub struct Party {
     members: Vec<Member>,
 }
