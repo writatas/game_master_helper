@@ -3,16 +3,26 @@ use eframe::egui::TextBuffer;
 use std::cell::Cell;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
-use serde_json;
+use serde::{Serialize, Deserialize};
+use std::path::PathBuf;
 
 //Constants
 const NUMBER_LIMIT:i32 = 10_000;
-
-// enums for structs
+const OS: &str = std::env::consts::OS;
+// specific enums for structs
 pub enum Boon {
     Advantage,
     Disadvantage,
     Plain
+}
+
+#[derive(Serialize, Deserialize)]
+enum Elements {
+    Story(Story),
+    Attribute(Attribute),
+    Skill(Skill),
+    Counter(Counter),
+    Table(Table)
 }
 // Traits
 trait DiceRoll {
@@ -20,9 +30,9 @@ trait DiceRoll {
 }
 pub trait SaveLoad {
     type Entity;
-    fn save(&self, database_path: &str, campaign_id: u32, order_num: u32, edit: bool) -> Result<(), String>;
-    fn update(&self, database_path: &str, entity_id: u32, order_num: u32, update_entity: Self::Entity) -> Result<(), String>;
-    fn delete(&self, database_path: &str, entity_id: u32) -> Result<(), String>;
+    fn values_to_json(self) -> Result<(), String>;
+    fn values_from_json(&mut self, serialized: &str) -> Result<(), String>;
+    fn delete_element(&mut self, entity_label: &str) -> Result<(), String>;
 }
 //Helper functions for structs
 fn parse_key(key_str: &str) -> Result<(u32, u32), std::num::ParseIntError> {
@@ -31,8 +41,80 @@ fn parse_key(key_str: &str) -> Result<(u32, u32), std::num::ParseIntError> {
     let y = parts[1].parse()?;
     Ok((x, y))
 }
+
+fn escape_sql(input: &str) -> String {
+    input.replace("'", "''")
+}
+
 // structs
+#[derive(Serialize, Deserialize)]
+struct TtrpgEntity {
+    pub id: u32,
+    pub name: String,
+    pub database: PathBuf,
+    pub elements: HashMap<String, Elements>
+}
+
+impl TtrpgEntity {
+    pub fn new(id: u32, name: String, database: &str) -> TtrpgEntity {
+        let current_dir = PathBuf::new();
+        let path = match OS {
+            "linux" => current_dir.join(format!("saved_dbs/{}", database)),
+            "macos" => current_dir.join(format!("saved_dbs/{}", database)),
+            "windows" => current_dir.join(format!("saved_dbs\\{}", database)),
+            _ => panic!("Unsupported OS!")
+        };
+        TtrpgEntity {
+            id,
+            name,
+            database: path,
+            elements: HashMap::new()
+        }
+    }
+    pub fn add_element(&mut self, element: Elements) -> Option<Elements>{
+        match element {
+            Elements::Story(s) => {
+                self.elements.insert(s.label.clone(), Elements::Story(s))
+            },
+            Elements::Attribute(a) => {
+                self.elements.insert(a.label.clone(), Elements::Attribute(a))
+            },
+            Elements::Skill(sk) => {
+                self.elements.insert(sk.label.clone(), Elements::Skill(sk))
+            },
+            Elements::Counter(c) => {
+                self.elements.insert(c.label.clone(), Elements::Counter(c))
+            },
+            Elements::Table(t) => {
+                self.elements.insert(t.label.clone(), Elements::Table(t))
+            },
+        }
+    }
+}
+
+impl SaveLoad for TtrpgEntity {
+    type Entity = TtrpgEntity;
+    fn values_to_json(self) -> Result<(), String> {
+        let serialized = serde_json::to_string(&self).unwrap();
+        println!("{}", serialized);
+        Ok(())
+    }
+    // Will transfer serialized values from a string that is retrieved from a database and assigns its values to be the same as the serialized values
+    fn values_from_json(&mut self, serialized: &str) -> Result<(), String> {
+        let deserialized = serde_json::from_str::<TtrpgEntity>(&serialized).unwrap();
+        *self = deserialized;
+        Ok(())
+    }
+  
+    fn delete_element(&mut self, entity_label: &str) -> Result<(), String> {
+        // implementation here
+        self.elements.remove(entity_label);
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
 struct Story {
     pub edit: Cell<bool>,
     pub id: u32,
@@ -48,12 +130,13 @@ impl Story {
             id, 
             order_num,
             label: label.to_string(), 
-            raw_narration: raw_narration.to_string(), 
+            raw_narration: escape_sql(raw_narration), 
         };
         Ok(story)
     }
     // TODO create a summarizing type to initilize the summary of the Story when created
     pub fn summary(self) -> Result<String, String> {
+        // Looking to using rust-bert crate to implement text summarization and text generation AI!
         Ok(self.raw_narration)
     }
     pub fn get_word_count(self) -> u32 {
@@ -82,6 +165,7 @@ impl TextBuffer for Story {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug)]
 struct Attribute {
     pub edit: Cell<bool>,
@@ -118,6 +202,7 @@ impl Attribute {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug)]
 struct Skill {
     pub edit: Cell<bool>,
@@ -196,6 +281,7 @@ impl Skill {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug)]
 struct Counter {
     pub edit: Cell<bool>,
@@ -229,7 +315,7 @@ impl Counter {
     }
 }
 
-
+#[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug)]
 struct Table {
     pub edit: Cell<bool>,
@@ -250,61 +336,31 @@ impl Table {
         };
         Ok(new_table)
     }
-        // Serialize the table values into json to be easily stored in a database
-        pub fn values_to_json(&self) -> String {
-            let map = &self.table;
-            let mut data = Vec::new();
-            for (key, value) in map {
-                let key_str = format!("{},{}", key.0, key.1);
-                let item = serde_json::json!({key_str: value});
-                data.push(item);
+    pub fn roll_to_text(&self, roll: &Outcome) -> String {
+        let roll_result: u32 = roll.base_result;
+        let mut result: String = String::from("");
+        for (range, value) in self.table.iter() {
+            if roll_result >= range.0 && roll_result <= range.1 {
+                result = value.clone();
             }
-            let value: serde_json::Value = data.into();
-            serde_json::to_string(&value).unwrap()
         }
-        // Use to Deserialize table values from it's Serialized json value
-        pub fn values_from_json(json_str: &str) ->  HashMap<(u32, u32), String> {
-            let value: serde_json::Value = serde_json::from_str(json_str).unwrap();
-            let mut map = HashMap::new();
-            if let serde_json::Value::Array(items) = value {
-                for item in items {
-                    if let serde_json::Value::Object(obj) = item {
-                        for (key_str, value) in obj {
-                            if let Ok((x, y)) = parse_key(&key_str) {
-                                if let serde_json::Value::String(s) = value {
-                                    map.insert((x, y), s);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            map
+        if result.len() == 0 {
+            return "Roll failed to produce a value.".to_string()
         }
-        pub fn roll_to_text(&self, roll: &Outcome) -> String {
-            let roll_result: u32 = roll.base_result;
-            let mut result: String = String::from("");
-            for (range, value) in self.table.iter() {
-                if roll_result >= range.0 && roll_result <= range.1 {
-                    result = value.clone();
-                }
-            }
-            if result.len() == 0 {
-                return "Roll failed to produce a value.".to_string()
-            }
-            result
-        }
-        pub fn add_row(&mut self, higher: u32, text: String) {
-            let keys:Vec<&(u32, u32)> = self.table.keys().collect();
-            let lower = if Some(keys.last()).is_some() {keys.last().unwrap().1} else {0};
-            let higher = if higher > lower && higher < NUMBER_LIMIT as u32 {higher} else {lower};
-            self.table.insert((lower, higher), text);
-        }
-        pub fn clear_table(&mut self) {
-            self.table.clear()
-        } 
+        result
+    }
+    pub fn add_row(&mut self, higher: u32, text: String) {
+        let keys:Vec<&(u32, u32)> = self.table.keys().collect();
+        let lower = if Some(keys.last()).is_some() {keys.last().unwrap().1} else {0};
+        let higher = if higher > lower && higher < NUMBER_LIMIT as u32 {higher} else {lower};
+        self.table.insert((lower, higher), text);
+    }
+    pub fn clear_table(&mut self) {
+        self.table.clear()
+    } 
 }
 
+#[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug)]
 pub struct Roll {
     pub pinned: Cell<bool>,
@@ -336,6 +392,7 @@ impl DiceRoll for Roll {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug)]
 pub struct Outcome {
     pub roll_description: String,

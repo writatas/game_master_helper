@@ -1,7 +1,25 @@
-#![allow(dead_code)]
-// Encounter calculator
+#![allow(dead_code, unused_variables, unused_assignments)]
 pub struct Party {
     members: Vec<Member>,
+}
+
+impl Party {
+    pub fn new() -> Party {
+        Party {members: Vec::new()}
+    }
+    pub fn add_member(&mut self, member: Member) {
+        self.members.push(member);
+    }
+    pub fn empty(&mut self) {
+        self.members.clear();
+    }
+    pub fn get_description(self) -> String {
+        let mut xp: i32 = 0;
+        for member in self.members.iter() {
+            xp += member.xp;
+        }
+        format!("{} members in party: {}xp", self.members.len(), xp)
+    }
 }
 
 pub struct Member {
@@ -9,14 +27,45 @@ pub struct Member {
     xp: i32,
 }
 
+impl Member {
+    pub fn new(level: i32, xp: i32) -> Member {
+        Member {level, xp}
+    }
+    pub fn get_description(self) -> String {
+        format!("Level {} character: {}xp", self.level, self.xp)
+    }
+}
+
 pub struct Encounter {
     monsters: Vec<Monster>,
+}
+
+impl Encounter {
+    pub fn add_monster(&mut self, monster: Monster) {
+        self.monsters.push(monster);
+    }
+    pub fn empty(&mut self) {
+        self.monsters.clear();
+    }
+    pub fn get_description(self) -> String {
+        format!("{} monsters", self.monsters.len())
+    }
 }
 
 pub struct Monster {
     xp: i32,
     challenge_rating: f32,
 }
+
+impl Monster {
+    pub fn new(challenge_rating: f32, xp: i32) -> Monster {
+        Monster {challenge_rating, xp}
+    }
+    pub fn get_description(self) -> String {
+        format!("Monster challenge rating {}: {}xp", self.challenge_rating as i32, self.xp)
+    }
+}
+
 
 pub fn calculate_difficulty(party: &Party, encounter: &Encounter, by_challenge_rating: bool) -> (String, i32, i32) {
     let mut total_xp = 0;
