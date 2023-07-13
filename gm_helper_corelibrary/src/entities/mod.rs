@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-use eframe::egui::TextBuffer;
 use std::cell::Cell;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
@@ -17,7 +16,7 @@ pub enum Boon {
 }
 
 #[derive(Serialize, Deserialize)]
-enum Elements {
+pub enum Elements {
     Story(Story),
     Attribute(Attribute),
     Skill(Skill),
@@ -48,7 +47,7 @@ fn escape_sql(input: &str) -> String {
 
 // structs
 #[derive(Serialize, Deserialize)]
-struct TtrpgEntity {
+pub struct TtrpgEntity {
     pub id: u32,
     pub name: String,
     pub database: PathBuf,
@@ -115,7 +114,7 @@ impl SaveLoad for TtrpgEntity {
 
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-struct Story {
+pub struct Story {
     pub edit: Cell<bool>,
     pub id: u32,
     pub order_num: u32,
@@ -145,29 +144,9 @@ impl Story {
     }
 }
 
-impl TextBuffer for Story {
-    fn is_mutable(&self) -> bool {
-        true
-    }
-
-    fn as_str(&self) -> &str {
-        &self.raw_narration
-    }
-
-    fn insert_text(&mut self, text: &str, char_index: usize) -> usize {
-        self.raw_narration.insert_str(char_index, text);
-        char_index + text.len()
-    }
-    fn delete_char_range(&mut self, char_range: std::ops::Range<usize>) {
-        let start = char_range.start;
-        let end = char_range.end;
-        self.raw_narration.replace_range(start..end, "");
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug)]
-struct Attribute {
+pub struct Attribute {
     pub edit: Cell<bool>,
     pub id: u32,
     pub order_num: u32,
@@ -204,7 +183,7 @@ impl Attribute {
 
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug)]
-struct Skill {
+pub struct Skill {
     pub edit: Cell<bool>,
     pub id: u32,
     pub order_num: u32,
@@ -283,7 +262,7 @@ impl Skill {
 
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug)]
-struct Counter {
+pub struct Counter {
     pub edit: Cell<bool>,
     pub id: u32,
     pub order_num: u32,
@@ -317,7 +296,7 @@ impl Counter {
 
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug)]
-struct Table {
+pub struct Table {
     pub edit: Cell<bool>,
     pub id: u32,
     pub order_num: u32,
