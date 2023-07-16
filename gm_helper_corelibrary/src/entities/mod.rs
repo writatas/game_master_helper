@@ -48,6 +48,7 @@ fn escape_sql(input: &str) -> String {
 // structs
 #[derive(Serialize, Deserialize)]
 pub struct TtrpgEntity {
+    pub active: Cell<bool>,
     pub id: u32,
     pub name: String,
     pub database: PathBuf,
@@ -55,7 +56,7 @@ pub struct TtrpgEntity {
 }
 
 impl TtrpgEntity {
-    pub fn new(id: u32, name: String, database: &str) -> TtrpgEntity {
+    pub fn new(active: bool, id: u32, name: String, database: &str) -> TtrpgEntity {
         let current_dir = PathBuf::new();
         let path = match OS {
             "linux" => current_dir.join(format!("saved_dbs/{}", database)),
@@ -64,6 +65,7 @@ impl TtrpgEntity {
             _ => panic!("Unsupported OS!")
         };
         TtrpgEntity {
+            active: Cell::new(active),
             id,
             name,
             database: path,
