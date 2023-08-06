@@ -4,6 +4,8 @@ use std::sync::Arc;
 use eframe::egui;
 use egui::{Pos2};
 use gm_helper_corelibrary::{TtrpgEntity, Story, Attribute, Counter, Skill, Table};
+use crate::buttons::text_button;
+use crate::collapsables::horizontal_menu_bar;
 
 pub struct MainWindow {
     selected_database:Cell<String>,
@@ -68,7 +70,13 @@ impl eframe::App for MainWindow {
             self.dice_rolls_creation_history.set(false);
         }
 
-
+        // CONFIGURATION WINDOW
+        if self.configure_creation_window.get() {
+            egui::TopBottomPanel::top("configure_creation_window").show(ctx, |ui| {
+                let buttons = vec![text_button("test", (100, 100, 100), (10.0, 10.0))];
+                horizontal_menu_bar(ui, buttons);
+            });
+        }
     }
 }
 
