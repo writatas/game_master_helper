@@ -73,7 +73,7 @@ impl eframe::App for MainWindow {
         // CONFIGURATION WINDOW
         if self.configure_creation_window.get() {
             egui::TopBottomPanel::top("configure_creation_window").show(ctx, |ui| {
-                let buttons = vec![text_button("test", (100, 100, 100), (10.0, 10.0))];
+                let buttons = vec![text_button("Create DB", (100, 100, 100), (10.0, 10.0))];
                 horizontal_menu_bar(ui, buttons);
             });
         }
