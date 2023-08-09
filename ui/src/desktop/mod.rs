@@ -7,13 +7,13 @@ use gm_helper_corelibrary::{TtrpgEntity, Story, Attribute, Counter, Skill, Table
 use crate::collapsables::*;
 
 pub struct MainWindow {
-    selected_database:Cell<String>,
+    selected_database: Cell<String>,
     configure_creation_window: Cell<bool>,
     selected_ttrpg_elements: Cell<bool>,
     dice_rolls_creation_history: Cell<bool>,
     saved_configs_window: Cell<bool>,
     saved_configurations: HashMap<String, bool>,
-    active_ttrpg_elements: Arc<Vec<TtrpgEntity>>
+    active_ttrpg_elements: Vec<TtrpgEntity>
 }
 
 impl Default for MainWindow {
@@ -24,7 +24,7 @@ impl Default for MainWindow {
         let dice_rolls_creation_history: Cell<bool> = Cell::new(false);
         let saved_configs_window: Cell<bool> = Cell::new(false);
         let saved_configurations: HashMap<String, bool> = HashMap::new();
-        let active_ttrpg_elements: Arc<Vec<TtrpgEntity>> = Arc::new(Vec::new());
+        let active_ttrpg_elements: Vec<TtrpgEntity> = Vec::new();
         Self {
             selected_database,
             configure_creation_window,
@@ -60,7 +60,7 @@ impl eframe::App for MainWindow {
         // SELECTED TTRPG WINDOW - left
         if self.selected_ttrpg_elements.get() {
             egui::SidePanel::left("selected_ttrpgs_window").show(ctx, |ui| {
-                let selected_ttrpg_window_size = selected_ttrpg_elements(ui);
+                let selected_ttrpg_window_size = selected_ttrpg_elements(ui, &mut self.active_ttrpg_elements);
                 if cursor_pos.x > selected_ttrpg_window_size.x {
                     self.selected_ttrpg_elements.set(false);
                 }
@@ -78,7 +78,7 @@ impl eframe::App for MainWindow {
         // CONFIGURATION WINDOW -top
         if self.configure_creation_window.get() {
             egui::TopBottomPanel::top("configure_creation_window").show(ctx, |ui| {
-                let config_window_size = configuration_ui(ui);
+                let config_window_size = configuration_ui(ui,&mut self.active_ttrpg_elements, &mut self.selected_database);
                 if cursor_pos.y > config_window_size.y {
                     self.configure_creation_window.set(false);
                 }
