@@ -54,7 +54,6 @@ pub struct TtrpgEntity {
     pub database: PathBuf,
     pub elements: HashMap<String, Elements>
 }
-
 impl TtrpgEntity {
     pub fn new(active: bool, id: u32, name: String, database: &str) -> TtrpgEntity {
         let current_dir = PathBuf::new();

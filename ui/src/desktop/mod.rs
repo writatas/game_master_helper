@@ -13,7 +13,8 @@ pub struct MainWindow {
     dice_rolls_creation_history: Cell<bool>,
     saved_configs_window: Cell<bool>,
     saved_configurations: HashMap<String, bool>,
-    active_ttrpg_elements: Vec<TtrpgEntity>
+    active_ttrpg_elements: Vec<TtrpgEntity>,
+    ttrpg_creation: Cell<TtrpgEntity> // Just a dummy ttrpg
 }
 
 impl Default for MainWindow {
@@ -25,6 +26,7 @@ impl Default for MainWindow {
         let saved_configs_window: Cell<bool> = Cell::new(false);
         let saved_configurations: HashMap<String, bool> = HashMap::new();
         let active_ttrpg_elements: Vec<TtrpgEntity> = Vec::new();
+        let ttrpg_creation: Cell<TtrpgEntity> = Cell::new(TtrpgEntity::new(false, 0, "TTrpg Creation".to_string(), ""));
         Self {
             selected_database,
             configure_creation_window,
@@ -32,7 +34,8 @@ impl Default for MainWindow {
             dice_rolls_creation_history,
             saved_configs_window,
             saved_configurations,
-            active_ttrpg_elements
+            active_ttrpg_elements,
+            ttrpg_creation
         }
     }
 }
@@ -78,8 +81,12 @@ impl eframe::App for MainWindow {
         // CONFIGURATION WINDOW -top
         if self.configure_creation_window.get() {
             egui::TopBottomPanel::top("configure_creation_window").show(ctx, |ui| {
-                let config_window_size = configuration_ui(ui,&mut self.active_ttrpg_elements, &mut self.selected_database);
-                if cursor_pos.y > config_window_size.y {
+                let config_window_size = configuration_ui(
+                    ui,&mut self.active_ttrpg_elements, 
+                    &mut self.selected_database, 
+                    ctx, &mut self.ttrpg_creation
+                );
+                if cursor_pos.y > config_window_size.y && !self.ttrpg_creation.get_mut().active.get() {
                     self.configure_creation_window.set(false);
                 }
             });
