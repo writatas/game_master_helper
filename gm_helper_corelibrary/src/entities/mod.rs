@@ -55,17 +55,19 @@ pub struct TtrpgEntity {
     pub elements: HashMap<String, Elements>
 }
 impl TtrpgEntity {
-    pub fn new(active: bool, id: u32, name: String, database: &str) -> TtrpgEntity {
+    pub fn new(active: bool, id: Option<u32>, name: String, database: Option<&str>) -> TtrpgEntity {
         let current_dir = PathBuf::new();
+        let db_string = database.unwrap_or("");
+        let id_num = id.unwrap_or(0);
         let path = match OS {
-            "linux" => current_dir.join(format!("saved_dbs/{}", database)),
-            "macos" => current_dir.join(format!("saved_dbs/{}", database)),
-            "windows" => current_dir.join(format!("saved_dbs\\{}", database)),
+            "linux" => current_dir.join(format!("./saved_dbs/{}", db_string)),
+            "macos" => current_dir.join(format!("./saved_dbs/{}", db_string)),
+            "windows" => current_dir.join(format!("./saved_dbs\\{}", db_string)),
             _ => panic!("Unsupported OS!")
         };
         TtrpgEntity {
             active: Cell::new(active),
-            id,
+            id: id_num,
             name,
             database: path,
             elements: HashMap::new()

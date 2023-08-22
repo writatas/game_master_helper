@@ -39,3 +39,5 @@ saves/*
 # ignore notes
 notes.txt
 
+# Any folder that is for saved databases
+saved_dbs

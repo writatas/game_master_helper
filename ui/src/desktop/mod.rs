@@ -8,6 +8,7 @@ use crate::collapsables::*;
 
 pub struct MainWindow {
     selected_database: Cell<String>,
+    new_database: Cell<String>,
     configure_creation_window: Cell<bool>,
     selected_ttrpg_elements: Cell<bool>,
     dice_rolls_creation_history: Cell<bool>,
@@ -20,15 +21,18 @@ pub struct MainWindow {
 impl Default for MainWindow {
     fn default() -> Self {
         let selected_database: Cell<String> = Cell::new("".to_string());
+        let new_database: Cell<String> = Cell::new("".to_string());
         let configure_creation_window: Cell<bool> = Cell::new(false);
         let selected_ttrpg_elements: Cell<bool> = Cell::new(false);
         let dice_rolls_creation_history: Cell<bool> = Cell::new(false);
         let saved_configs_window: Cell<bool> = Cell::new(false);
         let saved_configurations: HashMap<String, bool> = HashMap::new();
         let active_ttrpg_elements: Vec<TtrpgEntity> = Vec::new();
-        let ttrpg_creation: Cell<TtrpgEntity> = Cell::new(TtrpgEntity::new(false, 0, "TTrpg Creation".to_string(), ""));
+        // This is a dummy value that helps pass newly created ttrpg elements into the actual Vector that holds user created elements 
+        let ttrpg_creation: Cell<TtrpgEntity> = Cell::new(TtrpgEntity::new(false, None, "TTrpg Creation".to_string(), None));
         Self {
             selected_database,
+            new_database,
             configure_creation_window,
             selected_ttrpg_elements,
             dice_rolls_creation_history,
@@ -84,7 +88,8 @@ impl eframe::App for MainWindow {
                 let config_window_size = configuration_ui(
                     ui,&mut self.active_ttrpg_elements, 
                     &mut self.selected_database, 
-                    ctx, &mut self.ttrpg_creation
+                    &mut self.new_database, 
+                    &mut self.ttrpg_creation
                 );
                 if cursor_pos.y > config_window_size.y && !self.ttrpg_creation.get_mut().active.get() {
                     self.configure_creation_window.set(false);
