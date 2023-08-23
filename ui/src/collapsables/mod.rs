@@ -5,10 +5,11 @@ use eframe::egui::{Vec2, Ui, ComboBox, Button, Label, Window, Context, ScrollAre
 use sqlite::{Connection};
 //TODO new ttrpg_entity 
 // returns the ui height and width as a egui::Vec2 in order to calculate ui sizes
-pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, selected_db: &mut Cell<String>, new_database: &mut Cell<String>, new_ttrpg: &mut Cell<TtrpgEntity>) -> Vec2 { // Select database and load elements
+pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, selected_db: &mut Cell<Option<String>>, new_database: &mut Cell<String>, new_ttrpg: &mut Cell<TtrpgEntity>) -> Vec2 { // Select database and load elements
     let config_ui = ui.group(|ui| {
         let existing_paths = std::fs::read_dir("./saved_dbs/").unwrap();
         let mut paths = Vec::new();
+        let mut db = return_empty_string_if_none(selected_db);
         for p in existing_paths {
             paths.push(p.unwrap().path().display().to_string());
         }
@@ -16,13 +17,25 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, selected_db:
             ui.group(|ui| {
                 ui.add(Label::new("Select Database"));
                 ComboBox::from_id_source("databases")
-                    .selected_text(selected_db.get_mut().as_str())
+                    .selected_text(db.clone())
                     .show_ui(ui, |ui| {
                         for path in paths {
-                            let selectable_value = ui.selectable_value(selected_db.get_mut(), path.to_string().clone(), &path);
-                            if selectable_value.clicked() {
-                                selected_db.set(path);
-                            }
+                            ui.horizontal(|ui| {
+                                let selectable_value = ui.selectable_value(selected_db.get_mut(), Some(path.to_string().clone()), &path);
+                                if selectable_value.hovered() {
+                                    ui.label(">");
+                                }
+                                if selectable_value.clicked() {
+                                    selected_db.set(Some(path.clone()));
+                                    db = return_empty_string_if_none(selected_db);
+                                }
+                                if selectable_value.secondary_clicked() {
+                                    selected_db.set(Some(path.clone()));
+                                    std::fs::remove_file(path).expect("Failed to delete database file...");
+                                    selected_db.set(None);
+                                    db = return_empty_string_if_none(selected_db);
+                                }
+                            });
                         }
                     });
             });
@@ -33,12 +46,15 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, selected_db:
             ui.group(|ui|{
                 if ui.button("Create database").clicked() {
                     let dummy_ttrpg = TtrpgEntity::new(false, None, "dummy".to_string(), Some(new_database.get_mut()));
-                    // Create the database as long under condition checks if the selected_db is not empty, contains whitespace, and that the newly created one does not exist already
-                    if !selected_db.get_mut().is_empty() && 
-                    !selected_db.get_mut().contains(char::is_whitespace) &&
-                    !dummy_ttrpg.database.is_file()
-                    {
-                        println!("{:?}", dummy_ttrpg.database.as_os_str());
+                    let (db_string, string_len) = (new_database.get_mut().clone(), new_database.get_mut().clone().len());
+                    // Create the database as long under condition checks:
+                    // cannot contain whitespace, must be alphabetic,
+                    // and between the lengths of 0 to 50
+                    if !db_string.contains(char::is_whitespace) &&
+                    db_string.contains(char::is_alphabetic) && 
+                    string_len > 0 &&
+                    string_len < 50 &&
+                    !dummy_ttrpg.database.is_file() {
                         let connection = Connection::open(dummy_ttrpg.database.as_os_str()).expect("Database creation failed!");
                         let query = "
                             CREATE table ttrpgs (
@@ -47,7 +63,7 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, selected_db:
                                 json_string TEXT NOT NULL
                             );
                         ";
-                        connection.execute(query).expect("SQL query failure!");
+                        connection.execute(query).expect("SQL query failure; could not create database...");
                     }
                 }
                 ui.text_edit_singleline(new_database.get_mut())
@@ -74,6 +90,13 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, selected_db:
     config_ui.response.rect.size()
 }
 
+fn return_empty_string_if_none(option: &mut Cell<Option<String>>) -> String {
+    match option.get_mut().clone() {
+        Some(value) => value,
+        None => "".to_string()
+    }
+}
+
 pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Vec2 {
     let selected_ttrpg_ui = ui.group(|ui| {
             ui.strong(format!("Number of ttrpgs: {}", ttrpgs.len()));
@@ -89,6 +112,9 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                         // Database selection and creation per ttrpg element
                         ui.horizontal(|ui| {
                             // Select the Database this ttrpg should save to
+                            if ttrpg.database.as_os_str().is_empty() {
+                                
+                            }
                         });
                     });
                 }
