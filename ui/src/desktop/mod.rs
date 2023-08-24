@@ -7,7 +7,6 @@ use gm_helper_corelibrary::{TtrpgEntity, Story, Attribute, Counter, Skill, Table
 use crate::collapsables::*;
 
 pub struct MainWindow {
-    selected_database: Cell<Option<String>>,
     new_database: Cell<String>,
     configure_creation_window: Cell<bool>,
     selected_ttrpg_elements: Cell<bool>,
@@ -20,7 +19,6 @@ pub struct MainWindow {
 
 impl Default for MainWindow {
     fn default() -> Self {
-        let selected_database: Cell<Option<String>> = Cell::new(None);
         let new_database: Cell<String> = Cell::new("".to_string());
         let configure_creation_window: Cell<bool> = Cell::new(false);
         let selected_ttrpg_elements: Cell<bool> = Cell::new(false);
@@ -31,7 +29,6 @@ impl Default for MainWindow {
         // This is a dummy value that helps pass newly created ttrpg elements into the actual Vector that holds user created elements 
         let ttrpg_creation: Cell<TtrpgEntity> = Cell::new(TtrpgEntity::new(false, None, "TTrpg Creation".to_string(), None));
         Self {
-            selected_database,
             new_database,
             configure_creation_window,
             selected_ttrpg_elements,
@@ -87,7 +84,6 @@ impl eframe::App for MainWindow {
             egui::TopBottomPanel::top("configure_creation_window").show(ctx, |ui| {
                 let config_window_size = configuration_ui(
                     ui,&mut self.active_ttrpg_elements, 
-                    &mut self.selected_database, 
                     &mut self.new_database, 
                     &mut self.ttrpg_creation
                 );
