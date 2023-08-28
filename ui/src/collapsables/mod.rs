@@ -1,8 +1,7 @@
-use std::{collections::HashSet};
 use std::cell::Cell;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use gm_helper_corelibrary::TtrpgEntity;
-use eframe::egui::{Vec2, Ui, ComboBox, Button, Label, Window, Context, ScrollArea, Response};
+use eframe::egui::{Vec2, Ui, ComboBox, ScrollArea};
 use sqlite::{Connection};
 //TODO new ttrpg_entity 
 // returns the ui height and width as a egui::Vec2 in order to calculate ui sizes
@@ -54,7 +53,6 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database
         
     config_ui.response.rect.size()
 }
-
 pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Vec2 {
     let mut ttrpg_without_databases: u32 = 0;
     for ttrpg in ttrpgs.iter() {
@@ -88,23 +86,25 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                         } else {
                             ui.label("Selected database: ");
                         }
-                        ComboBox::from_id_source("ttrpg_db_selection")
-                            .selected_text(ttrpg.database.as_os_str().to_str().expect("Could not retrieve selected text"))
-                            .show_ui(ui, |ui| {
-                                for path in paths.clone() {
-                                    let mut current_path = Some(ttrpg.database.as_os_str().to_str().expect("could not get selectable value").to_string());
-                                    let path = if path.len() > 12 {path} else {"None selected".to_string()};
-                                    let selectable_value = ui.selectable_value(&mut current_path, Some(path.to_string().clone()), &path);
-                                    if selectable_value.clicked() {
-                                        ttrpg.database = Path::new(&path).to_path_buf();
-                                    }
-                                    if selectable_value.secondary_clicked() {
-                                        std::fs::remove_file(&path).expect("Failed to delete database file...");
-                                        // pushed to a vector to be looped over to set all the existing ttrpgs databases which where shared tp be nothing
-                                        dbs_to_delete.push(path);
-                                    }
+                        // combobox id is a blend of the ttrpg name and it's id
+                        ComboBox::from_id_source(format!("{}{}", ttrpg.name.clone(), ttrpg.id.clone()))
+                        .selected_text(ttrpg.database.as_os_str().to_str().expect("Could not retrieve selected text"))
+                        .show_ui(ui, |ui| {
+                            let no_dbs_found = "No databases found. Create a new one!".to_string();
+                                for path in paths.iter() {
+                                        let mut current_path = Some(ttrpg.database.as_os_str().to_str().expect("could not get selectable value").to_string());
+                                        let path = if path.len() > 12 {path} else {&no_dbs_found};
+                                        let selectable_value = ui.selectable_value(&mut current_path, Some(path.to_string().clone()), path.clone());
+                                        if selectable_value.clicked() {
+                                            ttrpg.database = Path::new(&path).to_path_buf();
+                                        }
+                                        if selectable_value.secondary_clicked() {
+                                            std::fs::remove_file(&path).expect("Failed to delete database file...");
+                                            // pushed to a vector to be looped over to set all the existing ttrpgs databases which where shared tp be nothing
+                                            dbs_to_delete.push(path.clone());
+                                        }
                                 }
-                            });
+                        });
                     });
                 });
             }
