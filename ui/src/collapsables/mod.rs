@@ -3,6 +3,7 @@ use std::path::Path;
 use gm_helper_corelibrary::TtrpgEntity;
 use eframe::egui::{Vec2, Ui, ComboBox, ScrollArea};
 use sqlite::{Connection};
+use rand::{distributions::Alphanumeric, Rng}; 
 //TODO new ttrpg_entity 
 // returns the ui height and width as a egui::Vec2 in order to calculate ui sizes
 pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database: &mut Cell<String>, new_ttrpg: &mut Cell<TtrpgEntity>) -> Vec2 { // Select database and load elements
@@ -40,9 +41,16 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database
                         if new_ttrpg.get_mut().name.clone().len() > 0 {
                             //Create a new copy of dummy value to pass user defined name into active ttrpgs
                             let new_ttrpg_element = TtrpgEntity::new(true, None, new_ttrpg.get_mut().name.clone().to_string(), None);
-                            ttrpgs.push(new_ttrpg_element);
-                            new_ttrpg.get_mut().active.set(false);
-                            new_ttrpg.get_mut().name = "".to_string();
+                            let mut existing_names: Vec<String> = Vec::new();
+                            for ttrpg in ttrpgs.iter() {
+                                existing_names.push(ttrpg.name.clone())
+                            }
+                            //ttrpg names should be unique
+                            if !existing_names.contains(&new_ttrpg_element.name) {
+                                ttrpgs.push(new_ttrpg_element);
+                                new_ttrpg.get_mut().active.set(false);
+                                new_ttrpg.get_mut().name = "".to_string();
+                            }
                         }
                         new_ttrpg.get_mut().active.set(false);
                     }
@@ -86,8 +94,8 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                         } else {
                             ui.label("Selected database: ");
                         }
-                        // combobox id is a blend of the ttrpg name and it's id
-                        ComboBox::from_id_source(format!("{}{}", ttrpg.name.clone(), ttrpg.id.clone()))
+
+                        ComboBox::from_id_source(format!("{}{}", &ttrpg.name, ttrpg.id))
                         .selected_text(ttrpg.database.as_os_str().to_str().expect("Could not retrieve selected text"))
                         .show_ui(ui, |ui| {
                             let no_dbs_found = "No databases found. Create a new one!".to_string();
@@ -139,4 +147,13 @@ pub fn saved_configs_window(ui: &mut Ui) -> Vec2 {
         });
     });
     saved_configs_window_ui.response.rect.size()
+}
+
+fn random_string() -> String {
+    let s:String = rand::thread_rng()
+    .sample_iter(&Alphanumeric)
+    .take(7)
+    .map(char::from)
+    .collect();
+    s
 }
