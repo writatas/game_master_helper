@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use std::cell::Cell;
+use anyhow::{Ok, Error};
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
@@ -29,16 +30,16 @@ trait DiceRoll {
 }
 pub trait SaveLoad {
     type Entity;
-    fn values_to_json(self) -> Result<(), String>;
-    fn values_from_json(&mut self, serialized: &str) -> Result<(), String>;
-    fn delete_element(&mut self, entity_label: &str) -> Result<(), String>;
+    fn values_to_json(&self) -> String;
+    fn values_from_json(&mut self, serialized: &str) -> Result<(), Error>;
+    fn delete_element(&mut self, entity_label: &str) -> Result<(), Error>;
 }
 //Helper functions for structs
-fn parse_key(key_str: &str) -> Result<(u32, u32), std::num::ParseIntError> {
+fn parse_key(key_str: &str) -> (u32, u32) {
     let parts: Vec<&str> = key_str.split(',').collect();
-    let x = parts[0].parse()?;
-    let y = parts[1].parse()?;
-    Ok((x, y))
+    let x = parts[0].parse().unwrap();
+    let y = parts[1].parse().unwrap();
+    (x, y)
 }
 
 fn escape_sql(input: &str) -> String {
@@ -49,16 +50,17 @@ fn escape_sql(input: &str) -> String {
 #[derive(Serialize, Deserialize)]
 pub struct TtrpgEntity {
     pub active: Cell<bool>,
-    pub id: u32,
+    pub id: String,
     pub name: String,
     pub database: PathBuf,
     pub elements: HashMap<String, Elements>
 }
+
 impl TtrpgEntity {
-    pub fn new(active: bool, id: Option<u32>, name: String, database: Option<&str>) -> TtrpgEntity {
+    pub fn new(active: bool, id: Option<String>, name: String, database: Option<&str>) -> TtrpgEntity {
         let current_dir = PathBuf::new();
         let db_string = database.unwrap_or("");
-        let id_num = id.unwrap_or(0);
+        let id_string = id.unwrap_or("".to_string());
         let path = match OS {
             "linux" => current_dir.join(format!("./saved_dbs/{}", db_string)),
             "macos" => current_dir.join(format!("./saved_dbs/{}", db_string)),
@@ -67,7 +69,7 @@ impl TtrpgEntity {
         };
         TtrpgEntity {
             active: Cell::new(active),
-            id: id_num,
+            id: id_string,
             name,
             database: path,
             elements: HashMap::new()
@@ -96,19 +98,19 @@ impl TtrpgEntity {
 
 impl SaveLoad for TtrpgEntity {
     type Entity = TtrpgEntity;
-    fn values_to_json(self) -> Result<(), String> {
+    fn values_to_json(&self) -> String {
         let serialized = serde_json::to_string(&self).unwrap();
         println!("{}", serialized);
-        Ok(())
+        serialized
     }
     // Will transfer serialized values from a string that is retrieved from a database and assigns its values to be the same as the serialized values
-    fn values_from_json(&mut self, serialized: &str) -> Result<(), String> {
+    fn values_from_json(&mut self, serialized: &str) -> Result<(), Error> {
         let deserialized = serde_json::from_str::<TtrpgEntity>(&serialized).unwrap();
         *self = deserialized;
         Ok(())
     }
   
-    fn delete_element(&mut self, entity_label: &str) -> Result<(), String> {
+    fn delete_element(&mut self, entity_label: &str) -> Result<(), Error> {
         // implementation here
         self.elements.remove(entity_label);
         Ok(())
@@ -126,7 +128,7 @@ pub struct Story {
 }
 
 impl Story {
-    pub fn new(id: u32, order_num: u32, label: &str, raw_narration: &str) -> Result<Story, String> {
+    pub fn new(id: u32, order_num: u32, label: &str, raw_narration: &str) -> Result<Story, Error> {
         let story = Story {
             edit:Cell::new(true), // defaults to true
             id, 
@@ -137,7 +139,7 @@ impl Story {
         Ok(story)
     }
     // TODO create a summarizing type to initilize the summary of the Story when created
-    pub fn summary(self) -> Result<String, String> {
+    pub fn summary(self) -> Result<String, Error> {
         // Looking to using rust-bert crate to implement text summarization and text generation AI!
         Ok(self.raw_narration)
     }
@@ -160,7 +162,7 @@ pub struct Attribute {
 }
 
 impl Attribute {
-    pub fn new(id: u32, order_num: u32, label: String, description: String, roll: Roll, critical: u32) -> Result<Attribute, String> {
+    pub fn new(id: u32, order_num: u32, label: String, description: String, roll: Roll, critical: u32) -> Result<Attribute, Error> {
         let roll = Outcome::new(&roll, critical, true);
         let attribute = Attribute {
             id,
@@ -198,7 +200,7 @@ pub struct Skill {
 }
 
 impl Skill {
-    pub fn new(id: u32, order_num: u32, label: String, level: u32, skill_level: u32, has_proficiency: bool) -> Result<Skill, String> {
+    pub fn new(id: u32, order_num: u32, label: String, level: u32, skill_level: u32, has_proficiency: bool) -> Result<Skill, Error> {
         let skill = Skill {
             id,
             order_num,
@@ -212,7 +214,7 @@ impl Skill {
         Ok(skill)
     }
 
-    pub fn get_description(self) -> Result<String, String> {
+    pub fn get_description(self) -> Result<String, Error> {
         if self.has_proficiency {
             return Ok(format!("{} {}({})", self.label, self.skill_level, self.proficiency));
         }
@@ -307,7 +309,7 @@ pub struct Table {
     pub table: HashMap<(u32, u32), String>
 }
 impl Table {
-    pub fn new(id: u32, order_num: u32, label: String, table: Vec<((u32, u32), String)>) -> Result<Table, String> {
+    pub fn new(id: u32, order_num: u32, label: String, table: Vec<((u32, u32), String)>) -> Result<Table, Error> {
         let vec_to_hash: HashMap<(u32, u32), String> = table.into_iter().collect();
         let new_table = Table {
             edit: Cell::new(false),

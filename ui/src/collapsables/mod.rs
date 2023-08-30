@@ -1,8 +1,9 @@
 use std::cell::Cell;
 use std::path::Path;
-use gm_helper_corelibrary::TtrpgEntity;
+use std::cmp::Ordering;
+use gm_helper_corelibrary::{TtrpgEntity, SaveLoad};
 use eframe::egui::{Vec2, Ui, ComboBox, ScrollArea};
-use sqlite::{Connection};
+use sqlite::Connection;
 use rand::{distributions::Alphanumeric, Rng}; 
 //TODO new ttrpg_entity 
 // returns the ui height and width as a egui::Vec2 in order to calculate ui sizes
@@ -76,19 +77,20 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
         paths.push(p.unwrap().path().display().to_string());
     }
     let mut dbs_to_delete: Vec<String> = Vec::new();
-    let mut ttrpgs_to_delete:Vec<(usize, String)> = Vec::new();
+    let mut ttrpgs_to_delete:Vec<(usize, String, bool)> = Vec::new(); // return a bool at the end to signify that it needs to be deleted from a database
     let selected_ttrpg_ui = ui.group(|ui| {
         ui.strong(format!("Number of ttrpg entities: {}", ttrpgs.len()));
         ui.strong(format!("Number of ttrpg entities without chosen databases: {}", ttrpg_without_databases));
         ScrollArea::vertical().show(ui, |ui| {
             for (index, ttrpg) in ttrpgs.iter_mut().enumerate() {
+                let db_selected = ttrpg.database.as_os_str().to_str().unwrap()[..12].cmp(&"").is_gt(); // the bool
                 ui.group(|ui| {
                     ui.strong(ttrpg.name.clone());
                     ui.horizontal_wrapped(|ui| {
                         let active_text = if ttrpg.active.get() {"Active"} else {"Not Active"};
                         ui.checkbox(ttrpg.active.get_mut(), active_text);
                         if ui.small_button("Delete").clicked() {
-                            ttrpgs_to_delete.push((index, ttrpg.name.clone()))
+                            ttrpgs_to_delete.push((index, ttrpg.name.clone(), db_selected));
                         }
                     });
                     ui.label(format!("Number of elements {}", ttrpg.elements.len()));
@@ -113,6 +115,22 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                                         }
                                 }
                         });
+                        if ui.small_button("Save").clicked() {
+                            let connection = Connection::open(ttrpg.database.as_os_str()).expect(format!("Failed to open database for ttrpg {}", &ttrpg.name).as_str());
+                            ttrpg.id = random_string(); // What is used to identify ttrpgs
+                            let query = format!(
+                                "
+                                    INSERT INTO ttrpgs (
+                                        json_string
+                                    )
+                                    VALUES ('{}');
+                                    
+                                ",
+                                ttrpg.values_to_json()
+                            );
+  
+                            connection.execute(query).expect(format!("Unable to save {}", &ttrpg.name).as_str());
+                        }
                     });
                 });
             }
@@ -122,18 +140,22 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
     if ttrpgs_to_delete.len() > 0 {
         for delete in ttrpgs_to_delete.iter() {
             ttrpgs.remove(delete.0);
+            if delete.2 {
+                //TODO need to delete ttrpg from database
+            } 
             println!("Deleted ttrpg: {}", delete.1);
         }
         ttrpgs_to_delete.clear();
     }
+
     if dbs_to_delete.len() > 0 {
-        let dummy_id: Option<u32> = None;
+        let dummy_id: Option<String> = None;
         let dummy_db: Option<&str> = None;
         for ttrpg in ttrpgs {
             for db in dbs_to_delete.iter() {
                 let delete_to_path_buff = Path::new(&db).to_path_buf();
                 if ttrpg.database.eq(&delete_to_path_buff) {
-                    ttrpg.database = TtrpgEntity::new(false, dummy_id, "deletion of database".to_string(), dummy_db).database; 
+                    ttrpg.database = TtrpgEntity::new(false, dummy_id.clone(), "deletion of database".to_string(), dummy_db).database; 
                 }
             }
         }
@@ -160,7 +182,7 @@ pub fn saved_configs_window(ui: &mut Ui) -> Vec2 {
 fn random_string() -> String {
     let s:String = rand::thread_rng()
     .sample_iter(&Alphanumeric)
-    .take(7)
+    .take(8)
     .map(char::from)
     .collect();
     s

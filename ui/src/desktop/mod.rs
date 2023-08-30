@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::cell::Cell;
-use std::sync::Arc;
 use eframe::egui;
-use egui::{Pos2};
+use egui::Pos2;
 use gm_helper_corelibrary::{TtrpgEntity, Story, Attribute, Counter, Skill, Table};
 use crate::collapsables::*;
 
