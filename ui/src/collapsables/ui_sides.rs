@@ -90,6 +90,7 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                     ui.horizontal_wrapped(|ui| {
                         let active_text = if ttrpg.active.get() {"Active"} else {"Not Active"};
                         ui.checkbox(ttrpg.active.get_mut(), active_text);
+
                         if ui.small_button("Delete").clicked() {
                             if db_selected && ttrpg.id.len() > 0 {
                                 let del_from_db = Connection::open(ttrpg.database.as_os_str())
@@ -117,6 +118,7 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                                         let selectable_value = ui.selectable_value(&mut current_path, path_cut.to_string() ,path_cut.to_string());
                                         if selectable_value.clicked() {
                                             ttrpg.database = Path::new(&path).to_path_buf();
+                                            ttrpg.id = "".to_string();
                                         }
                                         if selectable_value.secondary_clicked() {
                                             std::fs::remove_file(&path).expect("Failed to delete database file...");
