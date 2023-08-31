@@ -1,6 +1,5 @@
 use std::cell::Cell;
 use std::path::Path;
-use std::cmp::Ordering;
 use gm_helper_corelibrary::{TtrpgEntity, SaveLoad};
 use eframe::egui::{Vec2, Ui, ComboBox, ScrollArea};
 use sqlite::Connection;
@@ -9,33 +8,35 @@ use rand::{distributions::Alphanumeric, Rng};
 // returns the ui height and width as a egui::Vec2 in order to calculate ui sizes
 pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database: &mut Cell<String>, new_ttrpg: &mut Cell<TtrpgEntity>) -> Vec2 { // Select database and load elements
     let config_ui = ui.group(|ui| {
-            ui.group(|ui|{
-                ui.horizontal(|ui| {
-                    if ui.button("Create database").clicked() {
-                        let dummy_ttrpg = TtrpgEntity::new(false, None, "dummy".to_string(), Some(new_database.get_mut()));
-                        let (db_string, string_len) = (new_database.get_mut().clone(), new_database.get_mut().clone().len());
-                        // Create the database as long under condition checks:
-                        // cannot contain whitespace, must be alphabetic,
-                        // and between the lengths of 0 to 50
-                        if !db_string.contains(char::is_whitespace) &&
-                        db_string.contains(char::is_alphabetic) && 
-                        string_len > 0 &&
-                        string_len < 50 &&
-                        !dummy_ttrpg.database.is_file() {
-                            let connection = Connection::open(dummy_ttrpg.database.as_os_str()).expect("Database creation failed!");
-                            let query = "
-                                CREATE table ttrpgs (
-                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                    date DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    json_string TEXT NOT NULL
-                                );
-                            ";
-                            connection.execute(query).expect("SQL query failure; could not create database...");
-                        }
+        ui.group(|ui|{
+            ui.horizontal(|ui| {
+                if ui.button("Create database").clicked() {
+                    let dummy_ttrpg = TtrpgEntity::new(false, None, "dummy".to_string(), Some(new_database.get_mut()));
+                    let (db_string, string_len) = (new_database.get_mut().clone(), new_database.get_mut().clone().len());
+                    // Create the database as long under condition checks:
+                    // cannot contain whitespace, must be alphabetic,
+                    // and between the lengths of 0 to 50
+                    if !db_string.contains(char::is_whitespace) &&
+                    db_string.contains(char::is_alphabetic) && 
+                    string_len > 0 &&
+                    string_len < 50 &&
+                    !dummy_ttrpg.database.is_file() {
+                        let connection = Connection::open(dummy_ttrpg.database.as_os_str()).expect("Database creation failed!");
+                        let query = "
+                            CREATE table ttrpgs (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                string_id TEXT NOT NULL,
+                                date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                json_string TEXT NOT NULL
+                            );
+                        ";
+                        connection.execute(query).expect("SQL query failure; could not create database...");
+                        new_database.set("".to_string());
                     }
-                    ui.text_edit_singleline(new_database.get_mut())
-                });
+                }
+                ui.text_edit_singleline(new_database.get_mut())
             });
+        });
         
         new_ttrpg.get_mut().active.set(true);
         if new_ttrpg.get_mut().active.get() == true {
@@ -83,14 +84,23 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
         ui.strong(format!("Number of ttrpg entities without chosen databases: {}", ttrpg_without_databases));
         ScrollArea::vertical().show(ui, |ui| {
             for (index, ttrpg) in ttrpgs.iter_mut().enumerate() {
-                let db_selected = ttrpg.database.as_os_str().to_str().unwrap()[..12].cmp(&"").is_gt(); // the bool
+                let db_selected = ttrpg.database.as_os_str().to_str().unwrap()[12..].len().gt(&0);// the bool
                 ui.group(|ui| {
                     ui.strong(ttrpg.name.clone());
                     ui.horizontal_wrapped(|ui| {
                         let active_text = if ttrpg.active.get() {"Active"} else {"Not Active"};
                         ui.checkbox(ttrpg.active.get_mut(), active_text);
                         if ui.small_button("Delete").clicked() {
-                            ttrpgs_to_delete.push((index, ttrpg.name.clone(), db_selected));
+                            if db_selected && ttrpg.id.len() > 0 {
+                                let del_from_db = Connection::open(ttrpg.database.as_os_str())
+                                    .expect("Unable to create database connection");
+                                let query = format!("DELETE FROM ttrpgs WHERE string_id = '{}'", ttrpg.id);
+                                del_from_db.execute(query).expect("Could not delete ttrpg from database");
+                                ttrpgs_to_delete.push((index, ttrpg.name.clone(), db_selected));
+                            }
+                            else {
+                                ttrpgs_to_delete.push((index, ttrpg.name.clone(), db_selected));
+                            }
                         }
                     });
                     ui.label(format!("Number of elements {}", ttrpg.elements.len()));
@@ -98,7 +108,7 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                     ui.horizontal(|ui| {
                         // Select the Database this ttrpg should save to
                         ui.label("Selected database: ");
-                        ComboBox::from_id_source(format!("{}{}", &ttrpg.name, ttrpg.id))
+                        ComboBox::from_id_source(format!("{}", &ttrpg.name))
                         .selected_text(ttrpg.database.as_os_str().to_str().expect("Could not retrieve selected text"))
                         .show_ui(ui, |ui| {
                                 for path in paths.iter() {
@@ -110,27 +120,45 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                                         }
                                         if selectable_value.secondary_clicked() {
                                             std::fs::remove_file(&path).expect("Failed to delete database file...");
-                                            // pushed to a vector to be looped over to set all the existing ttrpgs databases which where shared tp be nothing
+                                            // pushed to a vector to be looped over to set all the existing ttrpgs databases which where shared to be nothing
                                             dbs_to_delete.push(path.clone());
                                         }
                                 }
                         });
-                        if ui.small_button("Save").clicked() {
-                            let connection = Connection::open(ttrpg.database.as_os_str()).expect(format!("Failed to open database for ttrpg {}", &ttrpg.name).as_str());
-                            ttrpg.id = random_string(); // What is used to identify ttrpgs
-                            let query = format!(
-                                "
-                                    INSERT INTO ttrpgs (
-                                        json_string
-                                    )
-                                    VALUES ('{}');
-                                    
-                                ",
-                                ttrpg.values_to_json()
-                            );
-  
-                            connection.execute(query).expect(format!("Unable to save {}", &ttrpg.name).as_str());
+                        if db_selected {
+                            if ui.small_button("Save").clicked() {
+                                let connection = Connection::open(ttrpg.database.as_os_str())
+                                    .expect(format!("Failed to open database for ttrpg {} - {:?}", &ttrpg.name, &ttrpg.database.as_os_str()).as_str());
+                                if ttrpg.id.len() == 0 {
+                                    ttrpg.id = random_string();
+                                    let query = format!(
+                                        "
+                                            INSERT INTO ttrpgs (
+                                                json_string,
+                                                string_id
+                                            )
+                                            VALUES ('{}', '{}');
+
+                                        ",
+                                        ttrpg.values_to_json(),
+                                        &ttrpg.id
+                                    );
+                                    println!("Saved {}", &ttrpg.name);
+                                    connection.execute(query).expect(format!("Unable to save {}", &ttrpg.name).as_str());
+                                }
+                                else {  
+                                    let query = format!(
+                                        "
+                                            UPDATE ttrpgs SET json_string = '{}' WHERE string_id = '{}';
+                                        ",
+                                        ttrpg.values_to_json(),
+                                        &ttrpg.id
+                                    );
+                                    println!("Updated {}", &ttrpg.name);
+                                    connection.execute(query).expect(format!("Unable to update {}", &ttrpg.name).as_str());
+                                }
                         }
+                    }
                     });
                 });
             }
@@ -140,9 +168,6 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
     if ttrpgs_to_delete.len() > 0 {
         for delete in ttrpgs_to_delete.iter() {
             ttrpgs.remove(delete.0);
-            if delete.2 {
-                //TODO need to delete ttrpg from database
-            } 
             println!("Deleted ttrpg: {}", delete.1);
         }
         ttrpgs_to_delete.clear();
@@ -162,6 +187,7 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
     }
     selected_ttrpg_ui.response.rect.size()
 }
+
 pub fn dice_rolls_and_creation_history (ui: &mut Ui) -> Vec2 {
     let dice_rolls_and_creation_history_ui = ui.group(|ui| {
         ui.horizontal_wrapped(|ui| {
@@ -170,6 +196,7 @@ pub fn dice_rolls_and_creation_history (ui: &mut Ui) -> Vec2 {
     });
     dice_rolls_and_creation_history_ui.response.rect.size()
 }
+
 pub fn saved_configs_window(ui: &mut Ui) -> Vec2 {
     let saved_configs_window_ui = ui.group(|ui| {
         ui.horizontal_wrapped(|ui| {
