@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::path::Path;
 use gm_helper_corelibrary::{TtrpgEntity, SaveLoad};
 use eframe::egui::{Vec2, Ui, ComboBox, ScrollArea};
-use sqlite::Connection;
+use sqlite::{Connection, State};
 use rand::{distributions::Alphanumeric, Rng}; 
 //TODO new ttrpg_entity 
 // returns the ui height and width as a egui::Vec2 in order to calculate ui sizes
@@ -79,6 +79,7 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
     }
     let mut dbs_to_delete: Vec<String> = Vec::new();
     let mut ttrpgs_to_delete:Vec<(usize, String, bool)> = Vec::new(); // return a bool at the end to signify that it needs to be deleted from a database
+    let mut ttrpgs_to_load: Vec<TtrpgEntity> = Vec::new();
     let selected_ttrpg_ui = ui.group(|ui| {
         ui.strong(format!("Number of ttrpg entities: {}", ttrpgs.len()));
         ui.strong(format!("Number of ttrpg entities without chosen databases: {}", ttrpg_without_databases));
@@ -119,6 +120,8 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                                         if selectable_value.clicked() {
                                             ttrpg.database = Path::new(&path).to_path_buf();
                                             ttrpg.id = "".to_string();
+                                            let load_ttrpgs = load_selected_database(&ttrpg.database);
+                                            ttrpgs_to_load = load_ttrpgs;
                                         }
                                         if selectable_value.secondary_clicked() {
                                             std::fs::remove_file(&path).expect("Failed to delete database file...");
@@ -178,13 +181,27 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
     if dbs_to_delete.len() > 0 {
         let dummy_id: Option<String> = None;
         let dummy_db: Option<&str> = None;
-        for ttrpg in ttrpgs {
-            for db in dbs_to_delete.iter() {
+        for ttrpg in ttrpgs.iter_mut() {
+            for db in dbs_to_delete.iter_mut() {
                 let delete_to_path_buff = Path::new(&db).to_path_buf();
                 if ttrpg.database.eq(&delete_to_path_buff) {
-                    ttrpg.database = TtrpgEntity::new(false, dummy_id.clone(), "deletion of database".to_string(), dummy_db).database; 
+                    let db_delete = TtrpgEntity::new(false, dummy_id.clone(), "deletion of database".to_string(), dummy_db).database;
+                    ttrpg.database =  db_delete;
                 }
             }
+        }
+    }
+    if ttrpgs_to_load.len() > 0 {
+        for t in ttrpgs_to_load.iter() {
+            ttrpgs.push(
+                TtrpgEntity {
+                    active: Cell::new(false),
+                    id: t.id.clone(),
+                    name: t.name.clone(),
+                    database: t.database.clone(),
+                    elements: t.elements.clone()
+                }
+            );
         }
     }
     selected_ttrpg_ui.response.rect.size()
@@ -215,4 +232,20 @@ fn random_string() -> String {
     .map(char::from)
     .collect();
     s
+}
+
+fn load_selected_database(path: &Path) -> Vec<TtrpgEntity> {
+    let mut ttrpgs: Vec<TtrpgEntity> = Vec::new();
+    let query = "SELECT * FROM ttrpgs";
+    let connection = Connection::open(path).expect("Could not load data from database");
+    let mut statement = connection.prepare(query).unwrap();
+
+    while let Ok(State::Row) = statement.next() {
+        let json_string = statement.read::<String, _>("json_string").unwrap();
+        let mut load_ttrpg = TtrpgEntity::new(false, None, "dummy".to_string(), None);
+        load_ttrpg.values_from_json(&json_string.as_str()).expect("Could not load ttrpg into vector from database");
+        ttrpgs.push(load_ttrpg);
+    }
+
+    ttrpgs
 }

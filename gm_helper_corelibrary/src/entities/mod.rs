@@ -16,7 +16,7 @@ pub enum Boon {
     Plain
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Elements {
     Story(Story),
     Attribute(Attribute),
