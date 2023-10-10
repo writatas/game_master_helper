@@ -81,6 +81,7 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
     let mut ttrpgs_to_delete:Vec<(usize, String, bool)> = Vec::new(); // return a bool at the end to signify that it needs to be deleted from a database
     let mut ttrpgs_to_load: Vec<TtrpgEntity> = Vec::new();
     let selected_ttrpg_ui = ui.group(|ui| {
+        if ui.button("clear view").clicked() { ttrpgs.clear();}
         ui.strong(format!("Number of ttrpg entities: {}", ttrpgs.len()));
         ui.strong(format!("Number of ttrpg entities without chosen databases: {}", ttrpg_without_databases));
         ScrollArea::vertical().show(ui, |ui| {
@@ -110,7 +111,7 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                     ui.horizontal(|ui| {
                         // Select the Database this ttrpg should save to
                         ui.label("Selected database: ");
-                        ComboBox::from_id_source(format!("{}", &ttrpg.name))
+                        ComboBox::from_id_source(format!("{}{}", &ttrpg.name, &index.to_string())) //ui id is the name of the ttrpg and the index to which it shows up on the list
                         .selected_text(ttrpg.database.as_os_str().to_str().expect("Could not retrieve selected text"))
                         .show_ui(ui, |ui| {
                                 for path in paths.iter() {
