@@ -50,6 +50,7 @@ fn escape_sql(input: &str) -> String {
 #[derive(Serialize, Deserialize)]
 pub struct TtrpgEntity {
     pub active: Cell<bool>,
+    pub edit: Cell<bool>,
     pub id: String,
     pub name: String,
     pub database: PathBuf,
@@ -57,7 +58,7 @@ pub struct TtrpgEntity {
 }
 
 impl TtrpgEntity {
-    pub fn new(active: bool, id: Option<String>, name: String, database: Option<&str>) -> TtrpgEntity {
+    pub fn new(active: bool, edit: bool, id: Option<String>, name: String, database: Option<&str>) -> TtrpgEntity {
         let current_dir = PathBuf::new();
         let db_string = database.unwrap_or("");
         let id_string = id.unwrap_or("".to_string());
@@ -69,6 +70,7 @@ impl TtrpgEntity {
         };
         TtrpgEntity {
             active: Cell::new(active),
+            edit: Cell::new(edit),
             id: id_string,
             name,
             database: path,
@@ -93,6 +95,13 @@ impl TtrpgEntity {
                 self.elements.insert(t.label.clone(), Elements::Table(t))
             },
         }
+    }
+    pub fn retrieve_all_element_ids(&self) -> Vec<String> {
+        let mut hash_ids = Vec::new();
+        for (hash, _el) in self.elements.iter() {
+            hash_ids.push(hash.clone());
+        }
+        hash_ids
     }
 }
 
@@ -147,6 +156,10 @@ impl Story {
         let words: Vec<&str> = self.raw_narration.split_whitespace().into_iter().collect();
         words.len() as u32
     }
+    pub fn edit(&mut self, label: String, new_text: String) {
+        self.label = label;
+        self.raw_narration = new_text;
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -184,6 +197,11 @@ impl Attribute {
         );
         description
     }
+    pub fn edit(&mut self, new_text: String, change_base_by: u32) { // change the value of the base roll (can increase / decrease atttributes this way)
+        self.roll.base_result += change_base_by;
+        self.modifier = (self.roll.base_result - 10) / 2 as u32;
+        self.description = format!("{} {} ({})", new_text, self.roll.base_result, self.modifier);
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -220,6 +238,10 @@ impl Skill {
         }
         Ok(format!("{} {}", self.label, self.skill_level))
     }
+    pub fn edit(&mut self) {
+
+    }
+
     pub fn roll_skill(self, advantage: Boon, critical: u32, difficulty: u32) -> String {
             match advantage {
                 Boon::Advantage => {

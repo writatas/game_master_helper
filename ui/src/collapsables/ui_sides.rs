@@ -11,7 +11,7 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database
         ui.group(|ui|{
             ui.horizontal(|ui| {
                 if ui.button("Create database").clicked() {
-                    let dummy_ttrpg = TtrpgEntity::new(false, None, "dummy".to_string(), Some(new_database.get_mut()));
+                    let dummy_ttrpg = TtrpgEntity::new(false, false, None, "dummy".to_string(), Some(new_database.get_mut()));
                     let (db_string, string_len) = (new_database.get_mut().clone(), new_database.get_mut().clone().len());
                     // Create the database as long under condition checks:
                     // cannot contain whitespace, must be alphabetic,
@@ -44,7 +44,7 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database
                     if ui.button("Create TTRPG!").clicked() {
                         if new_ttrpg.get_mut().name.clone().len() > 0 {
                             //Create a new copy of dummy value to pass user defined name into active ttrpgs
-                            let new_ttrpg_element = TtrpgEntity::new(true, None, new_ttrpg.get_mut().name.clone().to_string(), None);
+                            let new_ttrpg_element = TtrpgEntity::new(true, false, None, new_ttrpg.get_mut().name.clone().to_string(), None);
                             let mut existing_names: Vec<String> = Vec::new();
                             for ttrpg in ttrpgs.iter() {
                                 existing_names.push(ttrpg.name.clone())
@@ -186,7 +186,7 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
             for db in dbs_to_delete.iter_mut() {
                 let delete_to_path_buff = Path::new(&db).to_path_buf();
                 if ttrpg.database.eq(&delete_to_path_buff) {
-                    let db_delete = TtrpgEntity::new(false, dummy_id.clone(), "deletion of database".to_string(), dummy_db).database;
+                    let db_delete = TtrpgEntity::new(false, false, dummy_id.clone(), "deletion of database".to_string(), dummy_db).database;
                     ttrpg.database =  db_delete;
                 }
             }
@@ -197,6 +197,7 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
             ttrpgs.push(
                 TtrpgEntity {
                     active: Cell::new(false),
+                    edit: Cell::new(false),
                     id: t.id.clone(),
                     name: t.name.clone(),
                     database: t.database.clone(),
@@ -243,7 +244,7 @@ fn load_selected_database(path: &Path) -> Vec<TtrpgEntity> {
 
     while let Ok(State::Row) = statement.next() {
         let json_string = statement.read::<String, _>("json_string").unwrap();
-        let mut load_ttrpg = TtrpgEntity::new(false, None, "dummy".to_string(), None);
+        let mut load_ttrpg = TtrpgEntity::new(false, false, None, "dummy".to_string(), None);
         load_ttrpg.values_from_json(&json_string.as_str()).expect("Could not load ttrpg into vector from database");
         ttrpgs.push(load_ttrpg);
     }

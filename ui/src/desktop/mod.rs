@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::cell::Cell;
-use eframe::egui;
+use eframe::egui::{self, Ui};
 use egui::Pos2;
 use gm_helper_corelibrary::{TtrpgEntity, Story, Attribute, Counter, Skill, Table};
 use crate::collapsables::*;
@@ -26,7 +26,7 @@ impl Default for MainWindow {
         let saved_configurations: HashMap<String, bool> = HashMap::new();
         let active_ttrpg_elements: Vec<TtrpgEntity> = Vec::new();
         // This is a dummy value that helps pass newly created ttrpg elements into the actual Vector that holds user created elements 
-        let ttrpg_creation: Cell<TtrpgEntity> = Cell::new(TtrpgEntity::new(false, None, "TTrpg Creation".to_string(), None));
+        let ttrpg_creation: Cell<TtrpgEntity> = Cell::new(TtrpgEntity::new(false, false, None, "TTrpg Creation".to_string(), None));
         Self {
             new_database,
             configure_creation_window,
@@ -100,10 +100,24 @@ impl eframe::App for MainWindow {
                 }
             });
         }
+        // ACTIVE TTRPG ELEMENTS CENTRAL PANEL
+        egui::CentralPanel::default().show(ctx, |ui| {
+            display_active_elements(ui, &mut self.active_ttrpg_elements);
+        });
     }
 }
 
-
+fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEntity>) {
+    for entity in ttrpg_entities {
+        ui.horizontal(|ui| {
+            if entity.active.get() && !entity.edit.get() {
+                ui.label(entity.name.clone());
+                // display elements that are active and where edit is false
+            }
+            
+        });
+    }
+}
 
 fn track_cursor_position(ctx: &egui::Context) -> Pos2 {
     if let Some(pos) = ctx.input(|i| i.pointer.hover_pos()) {pos} else {egui::pos2(0.0, 0.0)}
