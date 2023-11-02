@@ -96,7 +96,7 @@ impl TtrpgEntity {
             },
         }
     }
-    pub fn retrieve_all_element_ids(&self) -> Vec<String> {
+    pub fn retrieve_all_element_keys(&self) -> Vec<String> {
         let mut hash_ids = Vec::new();
         for (hash, _el) in self.elements.iter() {
             hash_ids.push(hash.clone());

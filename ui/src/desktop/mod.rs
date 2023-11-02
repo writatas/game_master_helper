@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Add};
 use std::cell::Cell;
 use eframe::egui::{self, Ui};
 use egui::Pos2;
-use gm_helper_corelibrary::{TtrpgEntity, Story, Attribute, Counter, Skill, Table};
+use gm_helper_corelibrary::{TtrpgEntity, Story, Attribute, Counter, Skill, Table, Elements};
 use crate::collapsables::*;
 
 pub struct MainWindow {
@@ -13,7 +13,11 @@ pub struct MainWindow {
     saved_configs_window: Cell<bool>,
     saved_configurations: HashMap<String, bool>,
     active_ttrpg_elements: Vec<TtrpgEntity>,
-    ttrpg_creation: Cell<TtrpgEntity> // Just a dummy ttrpg
+    ttrpg_creation: Cell<TtrpgEntity>, // Just a dummy ttrpg
+    new_text_label: String,
+    new_text_body: String,
+    new_number: u32
+
 }
 
 impl Default for MainWindow {
@@ -27,6 +31,9 @@ impl Default for MainWindow {
         let active_ttrpg_elements: Vec<TtrpgEntity> = Vec::new();
         // This is a dummy value that helps pass newly created ttrpg elements into the actual Vector that holds user created elements 
         let ttrpg_creation: Cell<TtrpgEntity> = Cell::new(TtrpgEntity::new(false, false, None, "TTrpg Creation".to_string(), None));
+        let new_text_label = "".to_string();
+        let new_text_body = "".to_string();
+        let new_number = 0;
         Self {
             new_database,
             configure_creation_window,
@@ -35,7 +42,10 @@ impl Default for MainWindow {
             saved_configs_window,
             saved_configurations,
             active_ttrpg_elements,
-            ttrpg_creation
+            ttrpg_creation,
+            new_text_label,
+            new_text_body,
+            new_number
         }
     }
 }
@@ -102,21 +112,58 @@ impl eframe::App for MainWindow {
         }
         // ACTIVE TTRPG ELEMENTS CENTRAL PANEL
         egui::CentralPanel::default().show(ctx, |ui| {
-            display_active_elements(ui, &mut self.active_ttrpg_elements);
+            display_active_elements(ui, &mut self.active_ttrpg_elements, &mut self.new_text_label, &mut self.new_text_body, &mut self.new_number);
         });
     }
 }
 
-fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEntity>) {
+fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEntity>, new_text_label: &mut String, new_text_body: &mut String, new_number: &mut u32) {
     for entity in ttrpg_entities {
-        ui.horizontal(|ui| {
-            if entity.active.get() && !entity.edit.get() {
-                ui.label(entity.name.clone());
+            if entity.active.get() {
                 // display elements that are active and where edit is false
+                let element_ids = entity.retrieve_all_element_keys();
+                for key in element_ids {
+                    match entity.elements.get_mut(&key).unwrap() {
+                        Elements::Story(s) => {
+                            ui.horizontal(|ui| {
+                                ui.label(s.label.clone());
+                                if ui.button("edit").clicked() {
+                                    s.edit.set(true);
+                                    new_text_label.push_str(&s.label);
+                                    new_text_body.push_str(&s.raw_narration);
+                                }
+                                if s.edit.get() {
+                                    if ui.button("Save").clicked() {
+                                        s.edit.set(false);
+                                        s.edit(new_text_label.clone(), new_text_body.clone());
+                                        new_text_label.clear();
+                                        new_text_body.clear();
+
+                                    }
+                                    ui.text_edit_singleline(new_text_label);
+                                    ui.text_edit_multiline(new_text_body);
+            
+                                }
+                                else {
+                                    ui.label(s.label.clone());
+                                    ui.label(s.raw_narration.clone());
+                                }
+                            });
+                        },
+                        Elements::Attribute(a) => {
+                        },
+                        Elements::Skill(sk) => {
+                        },
+                        Elements::Counter(c) => {
+                        },
+                        Elements::Table(t) => {
+                        },
+                    }
+                }
             }
             
-        });
     }
+ 
 }
 
 fn track_cursor_position(ctx: &egui::Context) -> Pos2 {
