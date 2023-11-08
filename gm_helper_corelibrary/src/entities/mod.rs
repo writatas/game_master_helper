@@ -157,7 +157,7 @@ impl Story {
         words.len() as u32
     }
     pub fn edit(&mut self, label: String, new_text: String) {
-        self.label = label;
+        self.label = format!("{}:", label);
         self.raw_narration = new_text;
     }
 }

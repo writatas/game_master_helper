@@ -120,13 +120,27 @@ impl eframe::App for MainWindow {
 fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEntity>, new_text_label: &mut String, new_text_body: &mut String, new_number: &mut u32) {
     for entity in ttrpg_entities {
             if entity.active.get() {
+                ui.horizontal_top(|ui| {
+                    if ui.button("Story").clicked() {
+                        let elements_len = entity.elements.len() + 1;
+                        let elements_len = elements_len as u32;
+                        let new_story = Story::new( // Ids of elements stay 0 and change when saved
+                            0,
+                            elements_len,
+                            &new_text_label,
+                            &new_text_body
+                        );
+                        entity.add_element(
+                            Elements::Story(new_story.unwrap())
+                        );
+                    }
+                });
                 // display elements that are active and where edit is false
                 let element_ids = entity.retrieve_all_element_keys();
                 for key in element_ids {
                     match entity.elements.get_mut(&key).unwrap() {
                         Elements::Story(s) => {
-                            ui.horizontal(|ui| {
-                                ui.label(s.label.clone());
+                            ui.group(|ui| {
                                 if ui.button("edit").clicked() {
                                     s.edit.set(true);
                                     new_text_label.push_str(&s.label);
@@ -140,8 +154,14 @@ fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEnti
                                         new_text_body.clear();
 
                                     }
-                                    ui.text_edit_singleline(new_text_label);
-                                    ui.text_edit_multiline(new_text_body);
+                                    let mut label = ui.text_edit_singleline(new_text_label);
+                                    let mut body = ui.text_edit_multiline(new_text_body);
+
+                                    let label_available_width = label.ctx.available_rect();
+                                    let body_available_width = body.ctx.available_rect();
+
+                                    label.rect.set_width(label_available_width.width());
+                                    body.rect.set_width(body_available_width.width());
             
                                 }
                                 else {
@@ -169,6 +189,30 @@ fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEnti
 fn track_cursor_position(ctx: &egui::Context) -> Pos2 {
     if let Some(pos) = ctx.input(|i| i.pointer.hover_pos()) {pos} else {egui::pos2(0.0, 0.0)}
 }
+
+fn escape_special_chars(input_string: &str, reverse: bool) -> String { // To escape sql characters
+    let mut output_string = String::new();
+    for c in input_string.chars() {
+        match c {
+            '\'' | '\"' | '\\' | '\n' | '\r' | '\t' => {
+                if !reverse {
+                    output_string.push('\\');
+                }
+                output_string.push(c);
+            }
+            _ => output_string.push(c),
+        }
+    }
+    if !reverse {
+        output_string = output_string.replace("%", "\\%");
+        output_string = output_string.replace("_", "\\_");
+    } else {
+        output_string = output_string.replace("\\%", "%");
+        output_string = output_string.replace("\\_", "_");
+    }
+    output_string
+}
+
 
 pub fn start_desktop_app() -> Result<(), eframe::Error>
 {
