@@ -41,3 +41,6 @@ notes.txt
 
 # Any folder that is for saved databases
 saved_dbs
+
+#ignore any whisper.cpp model directories, anything ending in .cpp
+**/*.cpp

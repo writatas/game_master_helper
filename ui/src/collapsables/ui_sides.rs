@@ -1,6 +1,6 @@
 use std::cell::Cell;
 use std::path::Path;
-use gm_helper_corelibrary::{TtrpgEntity, SaveLoad};
+use gm_helper_corelibrary::{TtrpgEntity, SaveLoad, record_audio, transcribe_audio_file};
 use eframe::egui::{Vec2, Ui, ComboBox, ScrollArea};
 use sqlite::{Connection, State};
 use rand::{distributions::Alphanumeric, Rng}; 
@@ -40,27 +40,30 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database
         
         new_ttrpg.get_mut().active.set(true);
         if new_ttrpg.get_mut().active.get() == true {
-                ui.horizontal_wrapped(|ui| {
-                    if ui.button("Create TTRPG!").clicked() {
-                        if new_ttrpg.get_mut().name.clone().len() > 0 {
-                            //Create a new copy of dummy value to pass user defined name into active ttrpgs
-                            let new_ttrpg_element = TtrpgEntity::new(true, false, None, new_ttrpg.get_mut().name.clone().to_string(), None);
-                            let mut existing_names: Vec<String> = Vec::new();
-                            for ttrpg in ttrpgs.iter() {
-                                existing_names.push(ttrpg.name.clone())
-                            }
-                            //ttrpg names should be unique
-                            if !existing_names.contains(&new_ttrpg_element.name) {
-                                ttrpgs.push(new_ttrpg_element);
-                                new_ttrpg.get_mut().active.set(false);
-                                new_ttrpg.get_mut().name = "".to_string();
-                            }
+            ui.horizontal_wrapped(|ui| {
+                if ui.button("Create TTRPG!").clicked() {
+                    if new_ttrpg.get_mut().name.clone().len() > 0 {
+                        //Create a new copy of dummy value to pass user defined name into active ttrpgs
+                        let new_ttrpg_element = TtrpgEntity::new(true, false, None, new_ttrpg.get_mut().name.clone().to_string(), None);
+                        let mut existing_names: Vec<String> = Vec::new();
+                        for ttrpg in ttrpgs.iter() {
+                            existing_names.push(ttrpg.name.clone())
                         }
-                        new_ttrpg.get_mut().active.set(false);
+                        //ttrpg names should be unique
+                        if !existing_names.contains(&new_ttrpg_element.name) {
+                            ttrpgs.push(new_ttrpg_element);
+                            new_ttrpg.get_mut().active.set(false);
+                            new_ttrpg.get_mut().name = "".to_string();
+                        }
                     }
-                    ui.text_edit_singleline(&mut new_ttrpg.get_mut().name);
-                });
+                    new_ttrpg.get_mut().active.set(false);
+                }
+                ui.text_edit_singleline(&mut new_ttrpg.get_mut().name);
+            });
         }
+        
+        //Handling the recording and transcription of audio to text with whisper.cpp
+        
     });
         
     config_ui.response.rect.size()

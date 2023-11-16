@@ -16,7 +16,9 @@ pub struct MainWindow {
     ttrpg_creation: Cell<TtrpgEntity>, // Just a dummy ttrpg
     new_text_label: String,
     new_text_body: String,
-    new_number: u32
+    new_number: u32,
+    transcribed_audio: String,
+    recording: Cell<bool>
 
 }
 
@@ -34,6 +36,8 @@ impl Default for MainWindow {
         let new_text_label = "".to_string();
         let new_text_body = "".to_string();
         let new_number = 0;
+        let transcribed_audio = String::from("");
+        let recording = Cell::new(false);
         Self {
             new_database,
             configure_creation_window,
@@ -45,7 +49,9 @@ impl Default for MainWindow {
             ttrpg_creation,
             new_text_label,
             new_text_body,
-            new_number
+            new_number,
+            transcribed_audio,
+            recording
         }
     }
 }
