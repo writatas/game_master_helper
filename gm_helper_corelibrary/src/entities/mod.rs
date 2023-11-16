@@ -78,9 +78,11 @@ impl TtrpgEntity {
         }
     }
     pub fn add_element(&mut self, element: Elements) -> Option<Elements>{
+        let length_of_elements = self.elements.len() + 1;
+        let mut length_of_elements = length_of_elements as u32;
         match element {
             Elements::Story(s) => {
-                self.elements.insert(s.label.clone(), Elements::Story(s))
+                self.elements.insert(format!("{}-{}",s.label.clone(), length_of_elements), Elements::Story(s))
             },
             Elements::Attribute(a) => {
                 self.elements.insert(a.label.clone(), Elements::Attribute(a))

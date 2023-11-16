@@ -112,7 +112,9 @@ impl eframe::App for MainWindow {
         }
         // ACTIVE TTRPG ELEMENTS CENTRAL PANEL
         egui::CentralPanel::default().show(ctx, |ui| {
-            display_active_elements(ui, &mut self.active_ttrpg_elements, &mut self.new_text_label, &mut self.new_text_body, &mut self.new_number);
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                display_active_elements(ui, &mut self.active_ttrpg_elements, &mut self.new_text_label, &mut self.new_text_body, &mut self.new_number);
+            });
         });
     }
 }
@@ -122,11 +124,13 @@ fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEnti
             if entity.active.get() {
                 ui.horizontal_top(|ui| {
                     if ui.button("Story").clicked() {
+                        &new_text_label.clear();
+                        &new_text_body.clear();
                         let elements_len = entity.elements.len() + 1;
                         let elements_len = elements_len as u32;
                         let new_story = Story::new( // Ids of elements stay 0 and change when saved
-                            0,
-                            elements_len,
+                            elements_len + 1,
+                            elements_len + 1,
                             &new_text_label,
                             &new_text_body
                         );
@@ -141,7 +145,7 @@ fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEnti
                     match entity.elements.get_mut(&key).unwrap() {
                         Elements::Story(s) => {
                             ui.group(|ui| {
-                                if ui.button("edit").clicked() {
+                                if ui.button("edit").clicked() && !s.edit.get() { // if the edit button is clicked and not already selected
                                     s.edit.set(true);
                                     new_text_label.push_str(&s.label);
                                     new_text_body.push_str(&s.raw_narration);
