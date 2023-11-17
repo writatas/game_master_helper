@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 eframe = "0.22.0"
 gm_helper_corelibrary = {path = '../gm_helper_corelibrary'}
+whisper_installer = {path = '../whisper_installer'}
 rand = "0.8.5"
 sqlite = "0.31.0"

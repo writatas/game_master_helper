@@ -4,7 +4,7 @@ use eframe::egui::{self, Ui};
 use egui::Pos2;
 use gm_helper_corelibrary::{TtrpgEntity, Story, Attribute, Counter, Skill, Table, Elements};
 use crate::collapsables::*;
-
+use whisper_installer::install_whisper_cpp_model;
 pub struct MainWindow {
     new_database: Cell<String>,
     configure_creation_window: Cell<bool>,
