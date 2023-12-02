@@ -105,6 +105,9 @@ impl TtrpgEntity {
         }
         hash_ids
     }
+    pub fn remove_element(&mut self, key: &str) {
+        self.elements.remove(key);
+    }
 }
 
 impl SaveLoad for TtrpgEntity {

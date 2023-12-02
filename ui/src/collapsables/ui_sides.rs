@@ -11,6 +11,7 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database
         ui.group(|ui|{
             ui.horizontal(|ui| {
                 if ui.button("Create database").clicked() {
+                    ttrpgs.clear();
                     let dummy_ttrpg = TtrpgEntity::new(false, false, None, "dummy".to_string(), Some(new_database.get_mut()));
                     let (db_string, string_len) = (new_database.get_mut().clone(), new_database.get_mut().clone().len());
                     // Create the database as long under condition checks:

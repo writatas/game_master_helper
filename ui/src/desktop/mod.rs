@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Add};
 use std::cell::Cell;
-use eframe::egui::{self, Ui};
+use eframe::egui::{self, Ui, TextBuffer};
 use egui::Pos2;
 use gm_helper_corelibrary::{TtrpgEntity, Story, Attribute, Counter, Skill, Table, Elements};
 use crate::collapsables::*;
@@ -119,19 +119,20 @@ impl eframe::App for MainWindow {
         // ACTIVE TTRPG ELEMENTS CENTRAL PANEL
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                display_active_elements(ui, &mut self.active_ttrpg_elements, &mut self.new_text_label, &mut self.new_text_body, &mut self.new_number);
+                display_active_elements(ui, &mut self.active_ttrpg_elements, &mut self.new_text_label, &mut self.new_text_body, &mut self.new_number, &mut self.transcribed_audio);
             });
         });
     }
 }
 
-fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEntity>, new_text_label: &mut String, new_text_body: &mut String, new_number: &mut u32) {
+fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEntity>, new_text_label: &mut String, new_text_body: &mut String, new_number: &mut u32, transcribed_audio: &mut String) {
+    let mut elements_to_delete: Vec<String> = Vec::new();
     for entity in ttrpg_entities {
             if entity.active.get() {
                 ui.horizontal_top(|ui| {
                     if ui.button("Story").clicked() {
-                        &new_text_label.clear();
-                        &new_text_body.clear();
+                        let _ = &new_text_label.clear();
+                        let _ = &new_text_body.clear();
                         let elements_len = entity.elements.len() + 1;
                         let elements_len = elements_len as u32;
                         let new_story = Story::new( // Ids of elements stay 0 and change when saved
@@ -156,6 +157,9 @@ fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEnti
                                     new_text_label.push_str(&s.label);
                                     new_text_body.push_str(&s.raw_narration);
                                 }
+                                if ui.button("delete").clicked() {
+                                    elements_to_delete.push(key);
+                                }
                                 if s.edit.get() {
                                     if ui.button("Save").clicked() {
                                         s.edit.set(false);
@@ -167,6 +171,9 @@ fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEnti
                                     let mut label = ui.text_edit_singleline(new_text_label);
                                     let mut body = ui.text_edit_multiline(new_text_body);
 
+                                    if ui.button("use transcribed audio").clicked() {
+                                        new_text_body.insert_text(&transcribed_audio, 0);
+                                    }
                                     let label_available_width = label.ctx.available_rect();
                                     let body_available_width = body.ctx.available_rect();
 
@@ -190,6 +197,9 @@ fn display_active_elements(ui: &mut egui::Ui, ttrpg_entities: &mut Vec<TtrpgEnti
                         },
                     }
                 }
+                for el in elements_to_delete.iter() {
+                    entity.remove_element(&el);
+                }
             }
             
     }
@@ -200,28 +210,6 @@ fn track_cursor_position(ctx: &egui::Context) -> Pos2 {
     if let Some(pos) = ctx.input(|i| i.pointer.hover_pos()) {pos} else {egui::pos2(0.0, 0.0)}
 }
 
-fn escape_special_chars(input_string: &str, reverse: bool) -> String { // To escape sql characters
-    let mut output_string = String::new();
-    for c in input_string.chars() {
-        match c {
-            '\'' | '\"' | '\\' | '\n' | '\r' | '\t' => {
-                if !reverse {
-                    output_string.push('\\');
-                }
-                output_string.push(c);
-            }
-            _ => output_string.push(c),
-        }
-    }
-    if !reverse {
-        output_string = output_string.replace("%", "\\%");
-        output_string = output_string.replace("_", "\\_");
-    } else {
-        output_string = output_string.replace("\\%", "%");
-        output_string = output_string.replace("\\_", "_");
-    }
-    output_string
-}
 
 
 pub fn start_desktop_app() -> Result<(), eframe::Error>
