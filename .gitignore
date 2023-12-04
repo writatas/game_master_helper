@@ -44,3 +44,6 @@ saved_dbs
 
 #ignore any whisper.cpp model directories, anything ending in .cpp
 **/*.cpp
+
+#ignore whisper tmp files
+whisper_tmp

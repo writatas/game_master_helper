@@ -1,10 +1,12 @@
-use std::{collections::HashMap, ops::Add};
+use std::{collections::HashMap};
 use std::cell::Cell;
 use eframe::egui::{self, Ui, TextBuffer};
 use egui::Pos2;
 use gm_helper_corelibrary::{TtrpgEntity, Story, Attribute, Counter, Skill, Table, Elements};
 use crate::collapsables::*;
 use whisper_installer::install_whisper_cpp_model;
+use std::sync:: {Arc, Mutex};
+
 pub struct MainWindow {
     new_database: Cell<String>,
     configure_creation_window: Cell<bool>,
@@ -18,7 +20,7 @@ pub struct MainWindow {
     new_text_body: String,
     new_number: u32,
     transcribed_audio: String,
-    recording: Cell<bool>
+    recording: Arc<Mutex<bool>>
 
 }
 
@@ -37,7 +39,7 @@ impl Default for MainWindow {
         let new_text_body = "".to_string();
         let new_number = 0;
         let transcribed_audio = String::from("");
-        let recording = Cell::new(false);
+        let recording = Arc::new(Mutex::new(false));
         Self {
             new_database,
             configure_creation_window,
@@ -100,7 +102,9 @@ impl eframe::App for MainWindow {
                 let config_window_size = configuration_ui(
                     ui,&mut self.active_ttrpg_elements, 
                     &mut self.new_database, 
-                    &mut self.ttrpg_creation
+                    &mut self.ttrpg_creation,
+                    &mut self.recording,
+                    &mut self.transcribed_audio
                 );
                 if cursor_pos.y > config_window_size.y {
                     self.configure_creation_window.set(false);
@@ -214,6 +218,7 @@ fn track_cursor_position(ctx: &egui::Context) -> Pos2 {
 
 pub fn start_desktop_app() -> Result<(), eframe::Error>
 {
+    install_whisper_cpp_model("whisper.cpp").unwrap();
     let options = eframe::NativeOptions::default();
     eframe::run_native(
     "TTRPG Maker",

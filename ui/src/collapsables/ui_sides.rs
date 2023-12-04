@@ -1,12 +1,14 @@
 use std::cell::Cell;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::env;
 use gm_helper_corelibrary::{TtrpgEntity, SaveLoad, record_audio, transcribe_audio_file};
-use eframe::egui::{Vec2, Ui, ComboBox, ScrollArea};
+use eframe::egui::{Vec2, Ui, ComboBox, ScrollArea, TextBuffer};
 use sqlite::{Connection, State};
 use rand::{distributions::Alphanumeric, Rng}; 
+use std::sync::Arc;
 //TODO new ttrpg_entity 
 // returns the ui height and width as a egui::Vec2 in order to calculate ui sizes
-pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database: &mut Cell<String>, new_ttrpg: &mut Cell<TtrpgEntity>) -> Vec2 { // Select database and load elements
+pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database: &mut Cell<String>, new_ttrpg: &mut Cell<TtrpgEntity>, recording_bool: &mut Arc<std::sync::Mutex<bool>>, transcribed_audio: &mut String) -> Vec2 { // Select database and load elements
     let config_ui = ui.group(|ui| {
         ui.group(|ui|{
             ui.horizontal(|ui| {
@@ -37,6 +39,7 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database
                 }
                 ui.text_edit_singleline(new_database.get_mut())
             });
+            
         });
         
         new_ttrpg.get_mut().active.set(true);
@@ -64,7 +67,34 @@ pub fn configuration_ui(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>, new_database
         }
         
         //Handling the recording and transcription of audio to text with whisper.cpp
-        
+        let current_path = env::current_dir().unwrap();
+        let mut recording_audio_path = PathBuf::from(current_path);
+        recording_audio_path.push("whisper_tmp/record.wav");
+        let path_for_transcription = recording_audio_path.clone();
+        //File::create(&recording_audio_path).unwrap(); // Create the audio_file
+        if !*recording_bool.lock().unwrap() {
+            if ui.button("record").clicked() {
+                *recording_bool.lock().unwrap() = true;
+                let recording_bool_clone = recording_bool.clone();
+                let handle = std::thread::spawn(move || {
+                    record_audio(&recording_audio_path.into_os_string().to_str().unwrap(), recording_bool_clone).unwrap();
+                });
+                if !*recording_bool.lock().unwrap() {
+                    handle.join().unwrap();
+                }
+            }
+        } else {
+            if ui.button("stop recording").clicked() {
+                *recording_bool.lock().unwrap() = false;
+                println!("path to transcribe from {:#?}", path_for_transcription);
+            if path_for_transcription.exists() {
+                std::thread::sleep(std::time::Duration::from_millis(110));
+                let transcribed_audio_text = transcribe_audio_file(&path_for_transcription.into_os_string().to_str().unwrap());
+                transcribed_audio.insert_text(&transcribed_audio_text, transcribed_audio_text.len() + 1);
+            }
+            }
+        }
+
     });
         
     config_ui.response.rect.size()
@@ -85,7 +115,6 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
     let mut ttrpgs_to_delete:Vec<(usize, String, bool)> = Vec::new(); // return a bool at the end to signify that it needs to be deleted from a database
     let mut ttrpgs_to_load: Vec<TtrpgEntity> = Vec::new();
     let selected_ttrpg_ui = ui.group(|ui| {
-        if ui.button("clear view").clicked() { ttrpgs.clear();}
         ui.strong(format!("Number of ttrpg entities: {}", ttrpgs.len()));
         ui.strong(format!("Number of ttrpg entities without chosen databases: {}", ttrpg_without_databases));
         ScrollArea::vertical().show(ui, |ui| {
@@ -137,8 +166,9 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                         });
                         if db_selected {
                             if ui.small_button("Save").clicked() {
+                                if !&ttrpg.name.is_empty() {
                                 let connection = Connection::open(ttrpg.database.as_os_str())
-                                    .expect(format!("Failed to open database for ttrpg {} - {:?}", &ttrpg.name, &ttrpg.database.as_os_str()).as_str());
+                                .expect(format!("Failed to open database for ttrpg {} - {:?}", &ttrpg.name, &ttrpg.database.as_os_str()).as_str());
                                 if ttrpg.id.len() == 0 {
                                     ttrpg.id = random_string();
                                     let query = format!(
@@ -156,7 +186,11 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                                     println!("Saved {}", &ttrpg.name);
                                     connection.execute(query).expect(format!("Unable to save {}", &ttrpg.name).as_str());
                                 }
-                                else {  
+                                }
+                                else {
+                                    ttrpg.name = "No title".to_string();
+                                    let connection = Connection::open(ttrpg.database.as_os_str())
+                                        .expect(format!("Failed to open database for ttrpg {} - {:?}", &ttrpg.name, &ttrpg.database.as_os_str()).as_str());
                                     let query = format!(
                                         "
                                             UPDATE ttrpgs SET json_string = '{}' WHERE string_id = '{}';
@@ -164,7 +198,6 @@ pub fn selected_ttrpg_elements(ui: &mut Ui, ttrpgs: &mut Vec<TtrpgEntity>) -> Ve
                                         ttrpg.values_to_json(),
                                         &ttrpg.id
                                     );
-                                    println!("Updated {}", &ttrpg.name);
                                     connection.execute(query).expect(format!("Unable to update {}", &ttrpg.name).as_str());
                                 }
                         }
@@ -255,3 +288,4 @@ fn load_selected_database(path: &Path) -> Vec<TtrpgEntity> {
 
     ttrpgs
 }
+

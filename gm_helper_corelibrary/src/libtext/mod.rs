@@ -143,7 +143,7 @@ fn convert_sample_rate(file_name: &str) -> Result<(), hound::Error> {
     assert_eq!(reader.spec().sample_format, hound::SampleFormat::Int);
 
     // Set up the output WAV file with the new sample rate store in test_wavs for now
-    let output_file_name = format!("test_wavs/{}_output.wav", Path::new(file_name).file_stem().unwrap().to_str().unwrap());
+    let output_file_name = format!("whisper_tmp/{}_output.wav", Path::new(file_name).file_stem().unwrap().to_str().unwrap());
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: 16000,
